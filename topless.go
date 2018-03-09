@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -74,29 +76,55 @@ func printOut(cmdout <-chan string) {
 	}
 }
 
-func cleanLines(linenum int) {
-	if linenum == 1 {
-		fmt.Print(csiCode(Delete, All))
+func moveToBegin(linenum int, height int) {
+	if linenum == 0 {
+		return
+	} else if linenum == 1 {
 		fmt.Print(csiCode(Begin, 1))
-	} else {
+	} else if linenum > 1 && linenum < height {
 		for i := 1; i < linenum; i++ {
-			fmt.Print(csiCode(Delete, All))
 			fmt.Print(csiCode(Above, 1))
+		}
+	} else {
+		fmt.Print(csiCode(Move, 1, 1))
+	}
+}
+
+func printLines(lines []string, linenum int, height int) {
+	var num int
+	if linenum < height {
+		num = linenum
+	} else {
+		num = height
+	}
+	for i := 0; i < num; i++ {
+		fmt.Print(csiCode(Delete, All))
+		if i < num-1 {
+			fmt.Println(lines[i])
+		} else {
+			fmt.Print(lines[i])
 		}
 	}
 }
 
+func getWinHeight() int {
+	size, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return int(size.Row)
+}
+
 func rewriteLines(cmdout <-chan string) {
-	first := true
-	linenum := 0
+	oldlinenum := 0
 	for {
 		out := <-cmdout
-		if !first {
-			cleanLines(linenum)
-		}
-		linenum = len(strings.Split(out, "\n"))
-		fmt.Print(out)
-		first = false
+		height := getWinHeight()
+		moveToBegin(oldlinenum, height)
+		lines := strings.Split(out, "\n")
+		linenum := len(lines)
+		printLines(lines, linenum, height)
+		oldlinenum = linenum
 	}
 }
 
