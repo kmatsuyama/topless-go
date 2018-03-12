@@ -130,12 +130,20 @@ func rewriteLines(cmdout <-chan string) {
 
 func main() {
 	var sleepSec int
+	var interactive bool
 
 	flag.IntVar(&sleepSec, "s", 1, "sleep second")
+	flag.BoolVar(&interactive, "i", false, "interactive")
+
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
 		log.Fatalf("Command not Found.")
+	}
+	if !interactive {
+		exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+		exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+		defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
 	}
 
 	cmdout := make(chan string)
