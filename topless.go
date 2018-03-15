@@ -143,7 +143,7 @@ func rewriteLines(cmdout <-chan string) {
 	oldlinenum := 0
 	for {
 		out := <-cmdout
-		height := getWinHeight()
+		height := getWinHeight() - 1
 		lines := strings.Split(out, "\n")
 		linenum := len(lines)
 		cutExtraLines(oldlinenum, linenum, height)
