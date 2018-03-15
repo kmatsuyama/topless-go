@@ -110,18 +110,22 @@ func moveToBegin(oldlinenum int, newlinenum int, height int) {
 	}
 }
 
-func printLines(lines []string, linenum int, height int) {
-	num := linenum
+func printLineDiff(oldlines []string, oldlinenum int, newlines []string, newlinenum int, height int) {
+	linenum := newlinenum
 
-	if num > height {
-		num = height
+	if linenum > height {
+		linenum = height
 	}
-	for i := 0; i < num; i++ {
+	for i := 0; i < linenum; i++ {
+		if i < oldlinenum && newlines[i] != "" && oldlines[i] == newlines[i] {
+			fmt.Print(csiCode(Below, 1))
+			continue
+		}
 		fmt.Print(csiCode(Delete, All))
-		if i < num-1 {
-			fmt.Println(lines[i])
+		if i < linenum-1 {
+			fmt.Println(newlines[i])
 		} else {
-			fmt.Print(lines[i])
+			fmt.Print(newlines[i])
 		}
 	}
 }
@@ -135,6 +139,7 @@ func getWinHeight() int {
 }
 
 func rewriteLines(cmdout <-chan string) {
+	var oldlines []string
 	oldlinenum := 0
 	for {
 		out := <-cmdout
@@ -143,7 +148,8 @@ func rewriteLines(cmdout <-chan string) {
 		linenum := len(lines)
 		cutExtraLines(oldlinenum, linenum, height)
 		moveToBegin(oldlinenum, linenum, height)
-		printLines(lines, linenum, height)
+		printLineDiff(oldlines, oldlinenum, lines, linenum, height)
+		oldlines = lines
 		oldlinenum = linenum
 	}
 }
