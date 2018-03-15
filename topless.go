@@ -76,25 +76,44 @@ func printOut(cmdout <-chan string) {
 	}
 }
 
-func moveToBegin(linenum int, height int) {
+func cutExtraLines(oldlinenum int, newlinenum int, height int) {
+	if oldlinenum > height {
+		oldlinenum = height
+	}
+	if newlinenum > height {
+		newlinenum = height
+	}
+	if oldlinenum > newlinenum {
+		for i := 0; i < oldlinenum-newlinenum; i++ {
+			fmt.Print(csiCode(Delete, All))
+			fmt.Print(csiCode(Above, 1))
+		}
+	}
+}
+
+func moveToBegin(oldlinenum int, newlinenum int, height int) {
+	linenum := oldlinenum
+
+	if oldlinenum > newlinenum {
+		linenum = newlinenum
+	}
+	if linenum > height {
+		linenum = height
+	}
+
 	if linenum == 0 {
 		return
 	} else if linenum == 1 {
 		fmt.Print(csiCode(Begin, 1))
-	} else if linenum > 1 && linenum < height {
-		for i := 1; i < linenum; i++ {
-			fmt.Print(csiCode(Above, 1))
-		}
 	} else {
-		fmt.Print(csiCode(Move, 1, 1))
+		fmt.Print(csiCode(Above, linenum-1))
 	}
 }
 
 func printLines(lines []string, linenum int, height int) {
-	var num int
-	if linenum < height {
-		num = linenum
-	} else {
+	num := linenum
+
+	if num > height {
 		num = height
 	}
 	for i := 0; i < num; i++ {
@@ -120,9 +139,10 @@ func rewriteLines(cmdout <-chan string) {
 	for {
 		out := <-cmdout
 		height := getWinHeight()
-		moveToBegin(oldlinenum, height)
 		lines := strings.Split(out, "\n")
 		linenum := len(lines)
+		cutExtraLines(oldlinenum, linenum, height)
+		moveToBegin(oldlinenum, linenum, height)
 		printLines(lines, linenum, height)
 		oldlinenum = linenum
 	}
