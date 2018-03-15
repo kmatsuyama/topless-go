@@ -67,15 +67,6 @@ func runCmd(cmdstr []string, cmdout chan<- string, sleepSec int) {
 	}
 }
 
-func printOut(cmdout <-chan string) {
-	for {
-		out := <-cmdout
-		fmt.Print(csiCode(Clear, All))
-		fmt.Print(csiCode(Move, 1, 1))
-		fmt.Print(out)
-	}
-}
-
 func cutExtraLines(oldlinenum int, newlinenum int, height int) {
 	if oldlinenum > height {
 		oldlinenum = height
@@ -160,7 +151,6 @@ func main() {
 
 	flag.IntVar(&sleepSec, "s", 1, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
-
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
