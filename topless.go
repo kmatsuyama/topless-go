@@ -63,16 +63,6 @@ func treatStdin(stdin <-chan string) {
 	}
 }
 
-func runCmd(cmd *exec.Cmd) (string, error) {
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if len(out) != 0 {
-			err = errors.New(string(out))
-		}
-	}
-	return string(out), err
-}
-
 func runCmdstr(cmdstr ...string) (string, error) {
 	var cmd *exec.Cmd
 
@@ -87,13 +77,16 @@ func runCmdstr(cmdstr ...string) (string, error) {
 	default:
 		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
 	}
-	cmdout, err := runCmd(cmd)
-	return cmdout, err
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
 func runCriticalCmd(cmdstr ...string) string {
 	out, err := runCmdstr(cmdstr[0:]...)
 	if err != nil {
+		if out != "" {
+			log.Print(out)
+		}
 		log.Fatal(err)
 	}
 	return out
@@ -104,6 +97,9 @@ func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int) {
 	for {
 		output, err := runCmdstr(cmdstr[0:]...)
 		if err != nil {
+			if output != "" {
+				log.Print(output)
+			}
 			log.Fatal(err)
 		}
 		cmdout <- output
