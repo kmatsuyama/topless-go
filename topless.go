@@ -95,7 +95,14 @@ func runCmdstr(cmdstr ...string) (string, error) {
 	}
 	cmdout, err := runCmd(cmd)
 	return cmdout, err
+}
 
+func runCriticalCmd(cmdstr ...string) string {
+	out, err := runCmdstr(cmdstr[0:]...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return out
 }
 
 func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int) {
@@ -201,9 +208,9 @@ func main() {
 		log.Fatalf("Command not Found.")
 	}
 	if !interactive {
-		runCmdstr("stty", "-F", "/dev/tty", "cbreak", "min", "1")
-		runCmdstr("stty", "-F", "/dev/tty", "-echo")
-		defer runCmdstr("stty", "-F", "/dev/tty", "echo")
+		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
+		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
+		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
 		stdin := make(chan string)
 		go treatStdin(stdin)
 		go getStdin(stdin)
