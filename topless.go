@@ -199,14 +199,22 @@ func rewriteLines(cmdout <-chan string) {
 func main() {
 	var sleepSec int
 	var interactive bool
+	var shell bool
 
 	flag.IntVar(&sleepSec, "s", 1, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
+	flag.BoolVar(&shell, "sh", false, "executed through the shell")
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
 		log.Fatalf("Command not Found.")
 	}
+
+	cmd := flag.Args()
+	if shell {
+		cmd = append([]string{"sh", "-c"}, strings.Join(cmd, " "))
+	}
+
 	if !interactive {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
@@ -218,5 +226,5 @@ func main() {
 
 	cmdout := make(chan string)
 	go rewriteLines(cmdout)
-	runCmdRepeatedly(flag.Args(), cmdout, sleepSec)
+	runCmdRepeatedly(cmd, cmdout, sleepSec)
 }
