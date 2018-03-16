@@ -211,7 +211,8 @@ func main() {
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
-		log.Fatalf("Command not Found.")
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	cmd := flag.Args()
