@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -65,18 +64,13 @@ func treatStdin(stdin <-chan string) {
 }
 
 func runCmd(cmd *exec.Cmd) (string, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		if stderr.String() != "" {
-			err = errors.New(stderr.String())
+		if len(out) != 0 {
+			err = errors.New(string(out))
 		}
 	}
-	return stdout.String(), err
+	return string(out), err
 }
 
 func runCmdstr(cmdstr ...string) (string, error) {
