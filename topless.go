@@ -45,7 +45,7 @@ func csiCode(ctrl rune, num ...int) string {
 	return ""
 }
 
-func runCmd(cmdstr []string, cmdout chan<- string, sleepSec int) {
+func runCmd(cmdstr ...string) string {
 	var cmd *exec.Cmd
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -54,24 +54,30 @@ func runCmd(cmdstr []string, cmdout chan<- string, sleepSec int) {
 	if cmdlen == 0 {
 		log.Fatalf("Command not Found.")
 	}
+
+	switch len(cmdstr) {
+	case 1:
+		cmd = exec.Command(cmdstr[0])
+	default:
+		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
+	}
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			log.Print(stderr.String())
+		}
+		log.Fatal(err)
+	}
+	return stdout.String()
+}
+
+func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int) {
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
-		switch cmdlen {
-		case 1:
-			cmd = exec.Command(cmdstr[0])
-		default:
-			cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
-		}
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-		err := cmd.Run()
-		if err != nil {
-			if stderr.String() != "" {
-				log.Print(stderr.String())
-			}
-			log.Fatal(err)
-		}
-		cmdout <- stdout.String()
+		cmdout <- runCmd(cmdstr[0:]...)
 		time.Sleep(sleepTime)
 	}
 }
@@ -166,12 +172,12 @@ func main() {
 		log.Fatalf("Command not Found.")
 	}
 	if !interactive {
-		exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-		exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
-		defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
+		runCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
+		runCmd("stty", "-F", "/dev/tty", "-echo")
+		defer runCmd("stty", "-F", "/dev/tty", "echo")
 	}
 
 	cmdout := make(chan string)
-	go runCmd(flag.Args(), cmdout, sleepSec)
+	go runCmdRepeatedly(flag.Args(), cmdout, sleepSec)
 	rewriteLines(cmdout)
 }
