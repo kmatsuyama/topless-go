@@ -45,6 +45,24 @@ func csiCode(ctrl rune, num ...int) string {
 	return ""
 }
 
+func getStdin(stdin chan<- string) {
+	input := make([]byte, 1)
+	for {
+		os.Stdin.Read(input)
+		stdin <- string(input)
+	}
+}
+
+func treatStdin(stdin <-chan string) {
+	for {
+		input := <-stdin
+		switch input {
+		case "q":
+			os.Exit(0)
+		}
+	}
+}
+
 func runCmd(cmdstr ...string) string {
 	var cmd *exec.Cmd
 	var stdout bytes.Buffer
@@ -175,6 +193,9 @@ func main() {
 		runCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCmd("stty", "-F", "/dev/tty", "echo")
+		stdin := make(chan string)
+		go treatStdin(stdin)
+		go getStdin(stdin)
 	}
 
 	cmdout := make(chan string)
