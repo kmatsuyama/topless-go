@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"golang.org/x/sys/unix"
@@ -63,7 +64,7 @@ func treatStdin(stdin <-chan string) {
 	}
 }
 
-func runCmd(cmd *exec.Cmd) string {
+func runCmd(cmd *exec.Cmd) (string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -72,19 +73,18 @@ func runCmd(cmd *exec.Cmd) string {
 	err := cmd.Run()
 	if err != nil {
 		if stderr.String() != "" {
-			log.Print(stderr.String())
+			err = errors.New(stderr.String())
 		}
-		log.Fatal(err)
 	}
-	return stdout.String()
+	return stdout.String(), err
 }
 
-func runCmdstr(cmdstr ...string) string {
+func runCmdstr(cmdstr ...string) (string, error) {
 	var cmd *exec.Cmd
 
 	cmdlen := len(cmdstr)
 	if cmdlen == 0 {
-		log.Fatalf("Command not Found.")
+		return "", errors.New("Command not Found.")
 	}
 
 	switch len(cmdstr) {
@@ -93,14 +93,19 @@ func runCmdstr(cmdstr ...string) string {
 	default:
 		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
 	}
+	cmdout, err := runCmd(cmd)
+	return cmdout, err
 
-	return runCmd(cmd)
 }
 
 func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int) {
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
-		cmdout <- runCmdstr(cmdstr[0:]...)
+		output, err := runCmdstr(cmdstr[0:]...)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cmdout <- output
 		time.Sleep(sleepTime)
 	}
 	close(cmdout)
