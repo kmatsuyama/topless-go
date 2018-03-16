@@ -63,22 +63,9 @@ func treatStdin(stdin <-chan string) {
 	}
 }
 
-func runCmd(cmdstr ...string) string {
-	var cmd *exec.Cmd
+func runCmd(cmd *exec.Cmd) string {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-
-	cmdlen := len(cmdstr)
-	if cmdlen == 0 {
-		log.Fatalf("Command not Found.")
-	}
-
-	switch len(cmdstr) {
-	case 1:
-		cmd = exec.Command(cmdstr[0])
-	default:
-		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
-	}
 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -92,10 +79,28 @@ func runCmd(cmdstr ...string) string {
 	return stdout.String()
 }
 
+func runCmdstr(cmdstr ...string) string {
+	var cmd *exec.Cmd
+
+	cmdlen := len(cmdstr)
+	if cmdlen == 0 {
+		log.Fatalf("Command not Found.")
+	}
+
+	switch len(cmdstr) {
+	case 1:
+		cmd = exec.Command(cmdstr[0])
+	default:
+		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
+	}
+
+	return runCmd(cmd)
+}
+
 func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int) {
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
-		cmdout <- runCmd(cmdstr[0:]...)
+		cmdout <- runCmdstr(cmdstr[0:]...)
 		time.Sleep(sleepTime)
 	}
 }
@@ -190,9 +195,9 @@ func main() {
 		log.Fatalf("Command not Found.")
 	}
 	if !interactive {
-		runCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
-		runCmd("stty", "-F", "/dev/tty", "-echo")
-		defer runCmd("stty", "-F", "/dev/tty", "echo")
+		runCmdstr("stty", "-F", "/dev/tty", "cbreak", "min", "1")
+		runCmdstr("stty", "-F", "/dev/tty", "-echo")
+		defer runCmdstr("stty", "-F", "/dev/tty", "echo")
 		stdin := make(chan string)
 		go treatStdin(stdin)
 		go getStdin(stdin)
