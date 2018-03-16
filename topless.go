@@ -205,6 +205,6 @@ func main() {
 	}
 
 	cmdout := make(chan string)
-	go runCmdRepeatedly(flag.Args(), cmdout, sleepSec)
-	rewriteLines(cmdout)
+	go rewriteLines(cmdout)
+	runCmdRepeatedly(flag.Args(), cmdout, sleepSec)
 }
