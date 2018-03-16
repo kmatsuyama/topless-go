@@ -169,7 +169,8 @@ func getWinHeight() int {
 
 func rewriteLines(cmdout <-chan string) {
 	var oldlines []string
-	oldlinenum := 0
+	var oldlinenum int
+
 	for {
 		out := <-cmdout
 		height := getWinHeight() - 1
