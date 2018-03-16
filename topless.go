@@ -51,11 +51,11 @@ func getStdin(stdin chan<- string) {
 		os.Stdin.Read(input)
 		stdin <- string(input)
 	}
+	close(stdin)
 }
 
 func treatStdin(stdin <-chan string) {
-	for {
-		input := <-stdin
+	for input := range stdin {
 		switch input {
 		case "q":
 			os.Exit(0)
@@ -103,6 +103,7 @@ func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int) {
 		cmdout <- runCmdstr(cmdstr[0:]...)
 		time.Sleep(sleepTime)
 	}
+	close(cmdout)
 }
 
 func cutExtraLines(oldlinenum int, newlinenum int, height int) {
@@ -171,10 +172,9 @@ func rewriteLines(cmdout <-chan string) {
 	var oldlines []string
 	var oldlinenum int
 
-	for {
-		out := <-cmdout
+	for output := range cmdout {
 		height := getWinHeight() - 1
-		lines := strings.Split(out, "\n")
+		lines := strings.Split(output, "\n")
 		linenum := len(lines)
 		cutExtraLines(oldlinenum, linenum, height)
 		moveToBegin(oldlinenum, linenum, height)
