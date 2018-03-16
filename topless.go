@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"golang.org/x/sys/unix"
@@ -45,24 +46,32 @@ func csiCode(ctrl rune, num ...int) string {
 }
 
 func runCmd(cmdstr []string, cmdout chan<- string, sleepSec int) {
+	var cmd *exec.Cmd
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
 	cmdlen := len(cmdstr)
 	if cmdlen == 0 {
 		log.Fatalf("Command not Found.")
 	}
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
-		var out []byte
-		var err error
 		switch cmdlen {
 		case 1:
-			out, err = exec.Command(cmdstr[0]).Output()
+			cmd = exec.Command(cmdstr[0])
 		default:
-			out, err = exec.Command(cmdstr[0], cmdstr[1:]...).Output()
+			cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
 		}
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
 		if err != nil {
+			if stderr.String() != "" {
+				log.Print(stderr.String())
+			}
 			log.Fatal(err)
 		}
-		cmdout <- string(out)
+		cmdout <- stdout.String()
 		time.Sleep(sleepTime)
 	}
 }
