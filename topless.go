@@ -201,9 +201,13 @@ func main() {
 	var interactive bool
 	var shell bool
 
+	flag.Usage = func() {
+		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] command\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.IntVar(&sleepSec, "s", 1, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
-	flag.BoolVar(&shell, "sh", false, "executed through the shell")
+	flag.BoolVar(&shell, "sh", false, "execute through the shell")
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
