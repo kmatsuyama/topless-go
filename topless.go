@@ -33,6 +33,20 @@ const (
 	Back    = 'T'
 )
 
+type strArray struct {
+	elem []string
+	len  int
+}
+
+func newStrArray(str string, delim string) strArray {
+	elem := strings.Split(str, delim)
+	len := len(elem)
+	return strArray{
+		elem: elem,
+		len:  len,
+	}
+}
+
 func csiCode(ctrl rune, num ...int) string {
 	const CSI = "\033["
 
@@ -156,22 +170,22 @@ func moveToBegin(oldlinenum int, newlinenum int, height int) {
 	}
 }
 
-func printLineDiff(oldlines []string, oldlinenum int, newlines []string, newlinenum int, height int) {
-	linenum := newlinenum
+func printLineDiff(old strArray, new strArray, height int) {
+	linenum := new.len
 
 	if linenum > height {
 		linenum = height
 	}
 	for i := 0; i < linenum; i++ {
-		if i < oldlinenum && newlines[i] != "" && oldlines[i] == newlines[i] {
+		if i < old.len && new.elem[i] != "" && old.elem[i] == new.elem[i] {
 			fmt.Print(csiCode(Below, 1))
 			continue
 		}
 		fmt.Print(csiCode(Delete, All))
 		if i < linenum-1 {
-			fmt.Println(newlines[i])
+			fmt.Println(new.elem[i])
 		} else {
-			fmt.Print(newlines[i])
+			fmt.Print(new.elem[i])
 		}
 	}
 }
@@ -185,21 +199,18 @@ func getWinHeight() int {
 }
 
 func rewriteLines(cmdoutChan <-chan string) {
-	var oldlines []string
-	var oldlinenum int
+	var oldline strArray
 	var cmdout string
 
 	for {
 		select {
 		case cmdout = <-cmdoutChan:
 			height := getWinHeight() - 1
-			lines := strings.Split(cmdout, "\n")
-			linenum := len(lines)
-			cutExtraLines(oldlinenum, linenum, height)
-			moveToBegin(oldlinenum, linenum, height)
-			printLineDiff(oldlines, oldlinenum, lines, linenum, height)
-			oldlines = lines
-			oldlinenum = linenum
+			line := newStrArray(cmdout, "\n")
+			cutExtraLines(oldline.len, line.len, height)
+			moveToBegin(oldline.len, line.len, height)
+			printLineDiff(oldline, line, height)
+			oldline = line
 		}
 	}
 }
