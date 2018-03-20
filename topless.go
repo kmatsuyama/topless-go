@@ -187,16 +187,20 @@ func getWinHeight() int {
 func rewriteLines(cmdoutChan <-chan string) {
 	var oldlines []string
 	var oldlinenum int
+	var cmdout string
 
-	for cmdout := range cmdoutChan {
-		height := getWinHeight() - 1
-		lines := strings.Split(cmdout, "\n")
-		linenum := len(lines)
-		cutExtraLines(oldlinenum, linenum, height)
-		moveToBegin(oldlinenum, linenum, height)
-		printLineDiff(oldlines, oldlinenum, lines, linenum, height)
-		oldlines = lines
-		oldlinenum = linenum
+	for {
+		select {
+		case cmdout = <-cmdoutChan:
+			height := getWinHeight() - 1
+			lines := strings.Split(cmdout, "\n")
+			linenum := len(lines)
+			cutExtraLines(oldlinenum, linenum, height)
+			moveToBegin(oldlinenum, linenum, height)
+			printLineDiff(oldlines, oldlinenum, lines, linenum, height)
+			oldlines = lines
+			oldlinenum = linenum
+		}
 	}
 }
 
