@@ -92,7 +92,7 @@ func runCriticalCmd(cmdstr ...string) string {
 	return out
 }
 
-func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec int, force bool) {
+func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec uint, force bool) {
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
 		output, err := runCmdstr(cmdstr[0:]...)
@@ -187,7 +187,7 @@ func rewriteLines(cmdout <-chan string) {
 }
 
 func main() {
-	var sleepSec int
+	var sleepSec uint
 	var interactive bool
 	var shell bool
 	var force bool
@@ -196,7 +196,7 @@ func main() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.IntVar(&sleepSec, "s", 1, "sleep second")
+	flag.UintVar(&sleepSec, "s", 1, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
 	flag.BoolVar(&shell, "sh", false, "execute through the shell")
 	flag.BoolVar(&force, "f", false, "ignore execute error")
