@@ -190,6 +190,12 @@ func printLineDiff(old strArray, new strArray, height int) {
 	}
 }
 
+func rewriteLineDiff(old strArray, new strArray, height int) {
+	cutExtraLines(old.len, new.len, height)
+	moveToBegin(old.len, new.len, height)
+	printLineDiff(old, new, height)
+}
+
 func getWinHeight() int {
 	size, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
 	if err != nil {
@@ -200,17 +206,17 @@ func getWinHeight() int {
 
 func rewriteLines(cmdoutChan <-chan string) {
 	var oldline strArray
+	var newline strArray
 	var cmdout string
+	var height int
 
 	for {
+		height = getWinHeight() - 1
 		select {
 		case cmdout = <-cmdoutChan:
-			height := getWinHeight() - 1
-			line := newStrArray(cmdout, "\n")
-			cutExtraLines(oldline.len, line.len, height)
-			moveToBegin(oldline.len, line.len, height)
-			printLineDiff(oldline, line, height)
-			oldline = line
+			newline = newStrArray(cmdout, "\n")
+			rewriteLineDiff(oldline, newline, height)
+			oldline = newline
 		}
 	}
 }
