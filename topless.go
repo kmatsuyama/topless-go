@@ -54,11 +54,15 @@ func getStdin(stdin chan<- string) {
 	close(stdin)
 }
 
-func treatStdin(stdin <-chan string) {
+func treatStdin(stdin <-chan string, waitChan chan<- bool) {
+	var wait bool
 	for input := range stdin {
 		switch input {
 		case "q":
 			os.Exit(0)
+		case "w":
+			wait = !wait
+			waitChan <- wait
 		}
 	}
 }
@@ -92,9 +96,19 @@ func runCriticalCmd(cmdstr ...string) string {
 	return out
 }
 
-func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, sleepSec uint, force bool) {
+func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, waitChan <-chan bool, sleepSec uint, force bool) {
+	var wait bool
+
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
+		select {
+		case wait = <-waitChan:
+		default:
+		}
+		if wait {
+			time.Sleep(sleepTime)
+			continue
+		}
 		output, err := runCmdstr(cmdstr[0:]...)
 		if !force && err != nil {
 			if output != "" {
@@ -212,16 +226,18 @@ func main() {
 		cmd = append([]string{"sh", "-c"}, strings.Join(cmd, " "))
 	}
 
+	waitChan := make(chan bool)
+
 	if !interactive {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
 		stdin := make(chan string)
-		go treatStdin(stdin)
+		go treatStdin(stdin, waitChan)
 		go getStdin(stdin)
 	}
 
 	cmdout := make(chan string)
 	go rewriteLines(cmdout)
-	runCmdRepeatedly(cmd, cmdout, sleepSec, force)
+	runCmdRepeatedly(cmd, cmdout, waitChan, sleepSec, force)
 }
