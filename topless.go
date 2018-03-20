@@ -45,19 +45,19 @@ func csiCode(ctrl rune, num ...int) string {
 	return ""
 }
 
-func getStdin(stdin chan<- string) {
-	input := make([]byte, 1)
+func getStdin(stdinChan chan<- string) {
+	stdin := make([]byte, 1)
 	for {
-		os.Stdin.Read(input)
-		stdin <- string(input)
+		os.Stdin.Read(stdin)
+		stdinChan <- string(stdin)
 	}
-	close(stdin)
+	close(stdinChan)
 }
 
-func treatStdin(stdin <-chan string, waitChan chan<- bool) {
+func treatStdin(stdinChan <-chan string, waitChan chan<- bool) {
 	var wait bool
-	for input := range stdin {
-		switch input {
+	for stdin := range stdinChan {
+		switch stdin {
 		case "q":
 			os.Exit(0)
 		case "w":
@@ -96,7 +96,7 @@ func runCriticalCmd(cmdstr ...string) string {
 	return out
 }
 
-func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, waitChan <-chan bool, sleepSec uint, force bool) {
+func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, waitChan <-chan bool, sleepSec uint, force bool) {
 	var wait bool
 
 	sleepTime := time.Duration(sleepSec) * time.Second
@@ -109,17 +109,17 @@ func runCmdRepeatedly(cmdstr []string, cmdout chan<- string, waitChan <-chan boo
 			time.Sleep(sleepTime)
 			continue
 		}
-		output, err := runCmdstr(cmdstr[0:]...)
+		cmdout, err := runCmdstr(cmdstr[0:]...)
 		if !force && err != nil {
-			if output != "" {
-				log.Print(output)
+			if cmdout != "" {
+				log.Print(cmdout)
 			}
 			log.Fatal(err)
 		}
-		cmdout <- output
+		cmdoutChan <- cmdout
 		time.Sleep(sleepTime)
 	}
-	close(cmdout)
+	close(cmdoutChan)
 }
 
 func cutExtraLines(oldlinenum int, newlinenum int, height int) {
@@ -184,13 +184,13 @@ func getWinHeight() int {
 	return int(size.Row)
 }
 
-func rewriteLines(cmdout <-chan string) {
+func rewriteLines(cmdoutChan <-chan string) {
 	var oldlines []string
 	var oldlinenum int
 
-	for output := range cmdout {
+	for cmdout := range cmdoutChan {
 		height := getWinHeight() - 1
-		lines := strings.Split(output, "\n")
+		lines := strings.Split(cmdout, "\n")
 		linenum := len(lines)
 		cutExtraLines(oldlinenum, linenum, height)
 		moveToBegin(oldlinenum, linenum, height)
@@ -232,12 +232,12 @@ func main() {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
-		stdin := make(chan string)
-		go treatStdin(stdin, waitChan)
-		go getStdin(stdin)
+		stdinChan := make(chan string)
+		go treatStdin(stdinChan, waitChan)
+		go getStdin(stdinChan)
 	}
 
-	cmdout := make(chan string)
-	go rewriteLines(cmdout)
-	runCmdRepeatedly(cmd, cmdout, waitChan, sleepSec, force)
+	cmdoutChan := make(chan string)
+	go rewriteLines(cmdoutChan)
+	runCmdRepeatedly(cmd, cmdoutChan, waitChan, sleepSec, force)
 }
