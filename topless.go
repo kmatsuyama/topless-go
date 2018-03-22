@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -76,7 +77,7 @@ func getByteLength(b byte) int {
 	return 0
 }
 
-func getStdin(stdinChan chan<- string) {
+func getStdin(stdinChan chan<- rune) {
 	var stdin []byte
 	var length int
 
@@ -89,7 +90,8 @@ func getStdin(stdinChan chan<- string) {
 		}
 		length--
 		if length == 0 {
-			stdinChan <- string(stdin)
+			stdinR, _ := utf8.DecodeRune(stdin)
+			stdinChan <- stdinR
 			stdin = nil
 		} else if length < 0 {
 			length = 0
@@ -98,13 +100,13 @@ func getStdin(stdinChan chan<- string) {
 	close(stdinChan)
 }
 
-func treatStdin(stdinChan <-chan string, waitChan chan<- bool) {
+func treatStdin(stdinChan <-chan rune, waitChan chan<- bool) {
 	var wait bool
 	for stdin := range stdinChan {
 		switch stdin {
-		case "q":
+		case 'q':
 			os.Exit(0)
-		case "w":
+		case 'w':
 			wait = !wait
 			waitChan <- wait
 		}
@@ -283,7 +285,7 @@ func main() {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
-		stdinChan := make(chan string)
+		stdinChan := make(chan rune)
 		go treatStdin(stdinChan, waitChan)
 		go getStdin(stdinChan)
 	}
