@@ -59,11 +59,41 @@ func csiCode(ctrl rune, num ...int) string {
 	return ""
 }
 
+func getByteLength(b byte) int {
+	if b < 0x80 {
+		return 1
+	} else if 0xc2 <= b && b < 0xe0 {
+		return 2
+	} else if 0xe0 <= b && b < 0xf0 {
+		return 3
+	} else if 0xf0 <= b && b < 0xf8 {
+		return 4
+	} else if 0xf8 <= b && b < 0xfc {
+		return 5
+	} else if 0xfc <= b && b < 0xfd {
+		return 6
+	}
+	return 0
+}
+
 func getStdin(stdinChan chan<- string) {
-	stdin := make([]byte, 1)
+	var stdin []byte
+	var length int
+
+	input := make([]byte, 1)
 	for {
-		os.Stdin.Read(stdin)
-		stdinChan <- string(stdin)
+		os.Stdin.Read(input)
+		stdin = append(stdin, input[0])
+		if length == 0 {
+			length = getByteLength(input[0])
+		}
+		length--
+		if length == 0 {
+			stdinChan <- string(stdin)
+			stdin = nil
+		} else if length < 0 {
+			length = 0
+		}
 	}
 	close(stdinChan)
 }
