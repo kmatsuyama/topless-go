@@ -179,7 +179,8 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, waitChan <-chan
 	return err
 }
 
-func cutExtraLines(oldlinenum int, newlinenum int, height int) {
+func cutExtraLines(oldlinenum int, newlinenum int, height int) int {
+	var i int
 	if oldlinenum > height {
 		oldlinenum = height
 	}
@@ -187,23 +188,18 @@ func cutExtraLines(oldlinenum int, newlinenum int, height int) {
 		newlinenum = height
 	}
 	if oldlinenum > newlinenum {
-		for i := 0; i < oldlinenum-newlinenum; i++ {
+		for i = 0; i < oldlinenum-newlinenum; i++ {
 			fmt.Print(csiCode(Delete, All))
 			fmt.Print(csiCode(Above, 1))
 		}
 	}
+	return i
 }
 
-func moveToBegin(oldlinenum int, newlinenum int, height int) {
-	linenum := oldlinenum
-
-	if oldlinenum > newlinenum {
-		linenum = newlinenum
-	}
+func moveToBegin(linenum int, height int) {
 	if linenum > height {
 		linenum = height
 	}
-
 	if linenum == 0 {
 		return
 	} else if linenum == 1 {
@@ -234,8 +230,8 @@ func printLineDiff(old strArray, new strArray, height int) {
 }
 
 func rewriteLineDiff(old strArray, new strArray, height int) {
-	cutExtraLines(old.len, new.len, height)
-	moveToBegin(old.len, new.len, height)
+	cutline := cutExtraLines(old.len, new.len, height)
+	moveToBegin(old.len-cutline, height)
 	printLineDiff(old, new, height)
 }
 
