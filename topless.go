@@ -100,12 +100,14 @@ func getStdin(stdinChan chan<- rune) {
 	close(stdinChan)
 }
 
-func treatStdin(stdinChan <-chan rune, waitChan chan<- bool) {
+func treatStdin(stdinChan <-chan rune, waitChan chan<- bool, exitChan chan<- bool) {
 	var wait bool
+	var exit bool
 	for stdin := range stdinChan {
 		switch stdin {
 		case 'q':
-			os.Exit(0)
+			exit = !exit
+			exitChan <- exit
 		case 'w':
 			wait = !wait
 			waitChan <- wait
@@ -142,30 +144,39 @@ func runCriticalCmd(cmdstr ...string) string {
 	return out
 }
 
-func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, waitChan <-chan bool, sleepSec uint, force bool) {
+func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, waitChan <-chan bool, exitChan <-chan bool, sleepSec uint, force bool) error {
+	var cmdout string
+	var err error
 	var wait bool
+	var exit bool
 
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
 		select {
 		case wait = <-waitChan:
+		case exit = <-exitChan:
 		default:
+		}
+		if exit {
+			break
 		}
 		if wait {
 			time.Sleep(sleepTime)
 			continue
 		}
-		cmdout, err := runCmdstr(cmdstr[0:]...)
+		cmdout, err = runCmdstr(cmdstr[0:]...)
 		if !force && err != nil {
 			if cmdout != "" {
-				log.Print(cmdout)
+				fmt.Print(cmdout)
 			}
-			log.Fatal(err)
+			fmt.Println(err)
+			break
 		}
 		cmdoutChan <- cmdout
 		time.Sleep(sleepTime)
 	}
 	close(cmdoutChan)
+	return err
 }
 
 func cutExtraLines(oldlinenum int, newlinenum int, height int) {
@@ -280,17 +291,21 @@ func main() {
 	}
 
 	waitChan := make(chan bool)
+	exitChan := make(chan bool)
 
 	if !interactive {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
 		stdinChan := make(chan rune)
-		go treatStdin(stdinChan, waitChan)
+		go treatStdin(stdinChan, waitChan, exitChan)
 		go getStdin(stdinChan)
 	}
 
 	cmdoutChan := make(chan string)
 	go rewriteLines(cmdoutChan)
-	runCmdRepeatedly(cmd, cmdoutChan, waitChan, sleepSec, force)
+	err := runCmdRepeatedly(cmd, cmdoutChan, waitChan, exitChan, sleepSec, force)
+	if err != nil {
+		os.Exit(1)
+	}
 }
