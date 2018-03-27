@@ -39,6 +39,11 @@ type strArray struct {
 	len  int
 }
 
+type optToCmd struct {
+	sleepSec uint
+	force    bool
+}
+
 type stdinToCmd struct {
 	wait chan bool
 	exit chan bool
@@ -149,13 +154,13 @@ func runCriticalCmd(cmdstr ...string) string {
 	return out
 }
 
-func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, sleepSec uint, force bool) error {
+func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, optCmd optToCmd) error {
 	var cmdout string
 	var err error
 	var wait bool
 	var exit bool
 
-	sleepTime := time.Duration(sleepSec) * time.Second
+	sleepTime := time.Duration(optCmd.sleepSec) * time.Second
 	for {
 		select {
 		case wait = <-chanCmd.wait:
@@ -170,7 +175,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 			continue
 		}
 		cmdout, err = runCmdstr(cmdstr[0:]...)
-		if !force && err != nil {
+		if !optCmd.force && err != nil {
 			if cmdout != "" {
 				fmt.Print(cmdout)
 			}
@@ -266,19 +271,18 @@ func rewriteLines(cmdoutChan <-chan string) {
 }
 
 func main() {
-	var sleepSec uint
 	var interactive bool
 	var shell bool
-	var force bool
+	var optCmd optToCmd
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.UintVar(&sleepSec, "s", 1, "sleep second")
+	flag.UintVar(&optCmd.sleepSec, "s", 1, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
 	flag.BoolVar(&shell, "sh", false, "execute through the shell")
-	flag.BoolVar(&force, "f", false, "ignore execute error")
+	flag.BoolVar(&optCmd.force, "f", false, "ignore execute error")
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
@@ -304,7 +308,7 @@ func main() {
 
 	cmdoutChan := make(chan string)
 	go rewriteLines(cmdoutChan)
-	err := runCmdRepeatedly(cmd, cmdoutChan, chanCmd, sleepSec, force)
+	err := runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
 	if err != nil {
 		os.Exit(1)
 	}
