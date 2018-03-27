@@ -39,6 +39,11 @@ type strArray struct {
 	len  int
 }
 
+type stdinToCmd struct {
+	wait chan bool
+	exit chan bool
+}
+
 func newStrArray(str string, delim string) strArray {
 	elem := strings.Split(str, delim)
 	len := len(elem)
@@ -100,17 +105,17 @@ func getStdin(stdinChan chan<- rune) {
 	close(stdinChan)
 }
 
-func treatStdin(stdinChan <-chan rune, waitChan chan<- bool, exitChan chan<- bool) {
+func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd) {
 	var wait bool
 	var exit bool
 	for stdin := range stdinChan {
 		switch stdin {
 		case 'q':
 			exit = !exit
-			exitChan <- exit
+			chanCmd.exit <- exit
 		case 'w':
 			wait = !wait
-			waitChan <- wait
+			chanCmd.wait <- wait
 		}
 	}
 }
@@ -144,7 +149,7 @@ func runCriticalCmd(cmdstr ...string) string {
 	return out
 }
 
-func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, waitChan <-chan bool, exitChan <-chan bool, sleepSec uint, force bool) error {
+func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, sleepSec uint, force bool) error {
 	var cmdout string
 	var err error
 	var wait bool
@@ -153,8 +158,8 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, waitChan <-chan
 	sleepTime := time.Duration(sleepSec) * time.Second
 	for {
 		select {
-		case wait = <-waitChan:
-		case exit = <-exitChan:
+		case wait = <-chanCmd.wait:
+		case exit = <-chanCmd.exit:
 		default:
 		}
 		if exit {
@@ -286,21 +291,20 @@ func main() {
 		cmd = append([]string{"sh", "-c"}, strings.Join(cmd, " "))
 	}
 
-	waitChan := make(chan bool)
-	exitChan := make(chan bool)
+	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
 
 	if !interactive {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
 		stdinChan := make(chan rune)
-		go treatStdin(stdinChan, waitChan, exitChan)
+		go treatStdin(stdinChan, chanCmd)
 		go getStdin(stdinChan)
 	}
 
 	cmdoutChan := make(chan string)
 	go rewriteLines(cmdoutChan)
-	err := runCmdRepeatedly(cmd, cmdoutChan, waitChan, exitChan, sleepSec, force)
+	err := runCmdRepeatedly(cmd, cmdoutChan, chanCmd, sleepSec, force)
 	if err != nil {
 		os.Exit(1)
 	}
