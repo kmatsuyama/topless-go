@@ -49,6 +49,10 @@ type stdinToCmd struct {
 	exit chan bool
 }
 
+type stdinToWrite struct {
+	refresh chan bool
+}
+
 func newStrArray(str string, delim string) strArray {
 	elem := strings.Split(str, delim)
 	len := len(elem)
@@ -110,7 +114,7 @@ func getStdin(stdinChan chan<- rune) {
 	close(stdinChan)
 }
 
-func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd) {
+func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd, chanWrite stdinToWrite) {
 	var wait bool
 	var exit bool
 	for stdin := range stdinChan {
@@ -121,6 +125,8 @@ func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd) {
 		case 'w':
 			wait = !wait
 			chanCmd.wait <- wait
+		case 'r':
+			chanWrite.refresh <- true
 		}
 	}
 }
@@ -219,6 +225,20 @@ func moveToBegin(linenum int, height int) {
 	}
 }
 
+func printLine(line strArray, height int) {
+	len := line.len
+
+	if len > height {
+		len = height
+	}
+	for i := 0; i < len-1; i++ {
+		fmt.Print(csiCode(Delete, All))
+		fmt.Println(line.elem[i])
+	}
+	fmt.Print(csiCode(Delete, All))
+	fmt.Print(line.elem[len-1])
+}
+
 func printLineDiff(old strArray, new strArray, height int) {
 	linenum := new.len
 
@@ -253,7 +273,7 @@ func getWinHeight() int {
 	return int(size.Row)
 }
 
-func rewriteLines(cmdoutChan <-chan string) {
+func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 	var oldline strArray
 	var newline strArray
 	var cmdout string
@@ -262,6 +282,11 @@ func rewriteLines(cmdoutChan <-chan string) {
 	for {
 		height = getWinHeight() - 1
 		select {
+		case refresh := <-chanWrite.refresh:
+			if refresh {
+				moveToBegin(oldline.len, height)
+				printLine(oldline, height)
+			}
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n")
 			rewriteLineDiff(oldline, newline, height)
@@ -296,18 +321,19 @@ func main() {
 	}
 
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
+	chanWrite := stdinToWrite{make(chan bool)}
 
 	if !interactive {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
 		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
 		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
 		stdinChan := make(chan rune)
-		go treatStdin(stdinChan, chanCmd)
+		go treatStdin(stdinChan, chanCmd, chanWrite)
 		go getStdin(stdinChan)
 	}
 
 	cmdoutChan := make(chan string)
-	go rewriteLines(cmdoutChan)
+	go rewriteLines(cmdoutChan, chanWrite)
 	err := runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
 	if err != nil {
 		os.Exit(1)
