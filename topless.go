@@ -195,21 +195,21 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	return err
 }
 
-func cutExtraLines(oldlinenum int, newlinenum int, height int) int {
-	var i int
-	if oldlinenum > height {
-		oldlinenum = height
+func eraseToBegin(linenum int, height int) {
+	if linenum > height {
+		linenum = height
 	}
-	if newlinenum > height {
-		newlinenum = height
-	}
-	if oldlinenum > newlinenum {
-		for i = 0; i < oldlinenum-newlinenum; i++ {
+	if linenum == 0 {
+		return
+	} else if linenum == 1 {
+		fmt.Print(csiCode(Delete, All))
+		fmt.Print(csiCode(Begin, 1))
+	} else {
+		for i := 0; i < linenum-1; i++ {
 			fmt.Print(csiCode(Delete, All))
 			fmt.Print(csiCode(Above, 1))
 		}
 	}
-	return i
 }
 
 func moveToBegin(linenum int, height int) {
@@ -284,9 +284,13 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 			}
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n")
-			cutline := cutExtraLines(oldline.len, newline.len, height)
-			moveToBegin(oldline.len-cutline, height)
-			printLineDiff(oldline, newline, height)
+			if oldline.len != newline.len {
+				eraseToBegin(oldline.len, height)
+				printLine(newline, height, head)
+			} else {
+				moveToBegin(oldline.len, height)
+				printLineDiff(oldline, newline, height, head)
+			}
 			oldline = newline
 		}
 	}
