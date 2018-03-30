@@ -298,7 +298,7 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 		select {
 		case refresh := <-chanWrite.refresh:
 			if refresh {
-				moveToBegin(oldline.len)
+				eraseToBegin(oldline.len)
 				printLine(oldline, head)
 			}
 		case dhead := <-chanWrite.head:
