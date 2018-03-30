@@ -227,27 +227,27 @@ func checkHead(line strArray, head int, dhead int, height int) int {
 	return head
 }
 
-func eraseToBegin(linenum int) {
-	if linenum == 0 {
+func eraseToBegin(len int) {
+	if len == 0 {
 		return
-	} else if linenum == 1 {
+	} else if len == 1 {
 		fmt.Print(csiCode(Delete, All))
 		fmt.Print(csiCode(Begin, 1))
 	} else {
-		for i := 0; i < linenum-1; i++ {
+		for i := 0; i < len-1; i++ {
 			fmt.Print(csiCode(Delete, All))
 			fmt.Print(csiCode(Above, 1))
 		}
 	}
 }
 
-func moveToBegin(linenum int) {
-	if linenum == 0 {
+func moveToBegin(len int) {
+	if len == 0 {
 		return
-	} else if linenum == 1 {
+	} else if len == 1 {
 		fmt.Print(csiCode(Begin, 1))
 	} else {
-		fmt.Print(csiCode(Above, linenum-1))
+		fmt.Print(csiCode(Above, len-1))
 	}
 }
 
@@ -262,14 +262,14 @@ func printLine(line strArray, head int) {
 }
 
 func printLineDiff(old strArray, new strArray, head int) {
-	linenum := new.len
-	for i := head; i < linenum+head; i++ {
+	len := new.len
+	for i := head; i < len+head; i++ {
 		if i < old.len && new.elem[i] != "" && old.elem[i] == new.elem[i] {
 			fmt.Print(csiCode(Below, 1))
 			continue
 		}
 		fmt.Print(csiCode(Delete, All))
-		if i < linenum+head-1 {
+		if i < len+head-1 {
 			fmt.Println(new.elem[i])
 		} else {
 			fmt.Print(new.elem[i])
