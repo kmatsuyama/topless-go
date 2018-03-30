@@ -35,8 +35,9 @@ const (
 )
 
 type strArray struct {
-	elem []string
-	len  int
+	elem   []string
+	len    int
+	orgLen int
 }
 
 type optToCmd struct {
@@ -54,12 +55,17 @@ type stdinToWrite struct {
 	head    chan int
 }
 
-func newStrArray(str string, delim string) strArray {
+func newStrArray(str string, delim string, height int) strArray {
 	elem := strings.Split(str, delim)
-	len := len(elem)
+	orgLen := len(elem)
+	len := orgLen
+	if len > height {
+		len = height
+	}
 	return strArray{
-		elem: elem,
-		len:  len,
+		elem:   elem,
+		len:    len,
+		orgLen: orgLen,
 	}
 }
 
@@ -208,6 +214,19 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	return err
 }
 
+func checkHead(line strArray, head int, dhead int, height int) int {
+	if line.orgLen < height {
+		return 0
+	}
+	head = head + dhead
+	if head < 0 {
+		head = 0
+	} else if height+head > line.orgLen {
+		head = line.orgLen - height
+	}
+	return head
+}
+
 func eraseToBegin(linenum int) {
 	if linenum == 0 {
 		return
@@ -232,25 +251,25 @@ func moveToBegin(linenum int) {
 	}
 }
 
-func printLine(line strArray) {
+func printLine(line strArray, head int) {
 	len := line.len
-	for i := 0; i < len-1; i++ {
+	for i := head; i < len+head-1; i++ {
 		fmt.Print(csiCode(Delete, All))
 		fmt.Println(line.elem[i])
 	}
 	fmt.Print(csiCode(Delete, All))
-	fmt.Print(line.elem[len-1])
+	fmt.Print(line.elem[len+head-1])
 }
 
-func printLineDiff(old strArray, new strArray) {
+func printLineDiff(old strArray, new strArray, head int) {
 	linenum := new.len
-	for i := 0; i < linenum; i++ {
+	for i := head; i < linenum+head; i++ {
 		if i < old.len && new.elem[i] != "" && old.elem[i] == new.elem[i] {
 			fmt.Print(csiCode(Below, 1))
 			continue
 		}
 		fmt.Print(csiCode(Delete, All))
-		if i < linenum-1 {
+		if i < linenum+head-1 {
 			fmt.Println(new.elem[i])
 		} else {
 			fmt.Print(new.elem[i])
@@ -280,21 +299,24 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 		case refresh := <-chanWrite.refresh:
 			if refresh {
 				moveToBegin(oldline.len)
-				printLine(oldline)
+				printLine(oldline, head)
 			}
 		case dhead := <-chanWrite.head:
-			head = head + dhead
-		case cmdout = <-cmdoutChan:
-			newline = newStrArray(cmdout, "\n")
-			if newline.len > height {
-				newline.len = height
+			newhead := checkHead(oldline, head, dhead, height)
+			if newhead != head {
+				head = newhead
+				eraseToBegin(oldline.len)
+				printLine(oldline, head)
 			}
+		case cmdout = <-cmdoutChan:
+			newline = newStrArray(cmdout, "\n", height)
+			head = checkHead(newline, head, 0, height)
 			if oldline.len != newline.len {
 				eraseToBegin(oldline.len)
-				printLine(newline)
+				printLine(newline, head)
 			} else {
 				moveToBegin(oldline.len)
-				printLineDiff(oldline, newline)
+				printLineDiff(oldline, newline, head)
 			}
 			oldline = newline
 		}
