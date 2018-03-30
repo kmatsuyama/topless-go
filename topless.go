@@ -51,6 +51,7 @@ type stdinToCmd struct {
 
 type stdinToWrite struct {
 	refresh chan bool
+	head    chan int
 }
 
 func newStrArray(str string, delim string) strArray {
@@ -127,6 +128,18 @@ func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd, chanWrite stdinToWrit
 			chanCmd.wait <- wait
 		case 'r':
 			chanWrite.refresh <- true
+		case '\033':
+			stdin2 := <-stdinChan
+			switch stdin2 {
+			case '[':
+				stdin3 := <-stdinChan
+				switch stdin3 {
+				case Up:
+					chanWrite.head <- -1
+				case Down:
+					chanWrite.head <- +1
+				}
+			}
 		}
 	}
 }
@@ -258,6 +271,7 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 	var newline strArray
 	var cmdout string
 	var height int
+	var head int
 
 	for {
 		height, _ = getWinSize()
@@ -268,6 +282,8 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 				moveToBegin(oldline.len)
 				printLine(oldline)
 			}
+		case dhead := <-chanWrite.head:
+			head = head + dhead
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n")
 			if newline.len > height {
@@ -311,7 +327,7 @@ func main() {
 	}
 
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
-	chanWrite := stdinToWrite{make(chan bool)}
+	chanWrite := stdinToWrite{make(chan bool), make(chan int)}
 
 	if !interactive {
 		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
