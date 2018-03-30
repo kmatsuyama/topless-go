@@ -195,10 +195,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	return err
 }
 
-func eraseToBegin(linenum int, height int) {
-	if linenum > height {
-		linenum = height
-	}
+func eraseToBegin(linenum int) {
 	if linenum == 0 {
 		return
 	} else if linenum == 1 {
@@ -212,10 +209,7 @@ func eraseToBegin(linenum int, height int) {
 	}
 }
 
-func moveToBegin(linenum int, height int) {
-	if linenum > height {
-		linenum = height
-	}
+func moveToBegin(linenum int) {
 	if linenum == 0 {
 		return
 	} else if linenum == 1 {
@@ -225,12 +219,8 @@ func moveToBegin(linenum int, height int) {
 	}
 }
 
-func printLine(line strArray, height int) {
+func printLine(line strArray) {
 	len := line.len
-
-	if len > height {
-		len = height
-	}
 	for i := 0; i < len-1; i++ {
 		fmt.Print(csiCode(Delete, All))
 		fmt.Println(line.elem[i])
@@ -239,12 +229,8 @@ func printLine(line strArray, height int) {
 	fmt.Print(line.elem[len-1])
 }
 
-func printLineDiff(old strArray, new strArray, height int) {
+func printLineDiff(old strArray, new strArray) {
 	linenum := new.len
-
-	if linenum > height {
-		linenum = height
-	}
 	for i := 0; i < linenum; i++ {
 		if i < old.len && new.elem[i] != "" && old.elem[i] == new.elem[i] {
 			fmt.Print(csiCode(Below, 1))
@@ -279,17 +265,20 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 		select {
 		case refresh := <-chanWrite.refresh:
 			if refresh {
-				moveToBegin(oldline.len, height)
-				printLine(oldline, height)
+				moveToBegin(oldline.len)
+				printLine(oldline)
 			}
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n")
+			if newline.len > height {
+				newline.len = height
+			}
 			if oldline.len != newline.len {
-				eraseToBegin(oldline.len, height)
-				printLine(newline, height, head)
+				eraseToBegin(oldline.len)
+				printLine(newline)
 			} else {
-				moveToBegin(oldline.len, height)
-				printLineDiff(oldline, newline, height, head)
+				moveToBegin(oldline.len)
+				printLineDiff(oldline, newline)
 			}
 			oldline = newline
 		}
