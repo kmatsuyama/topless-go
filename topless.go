@@ -277,14 +277,6 @@ func printLineDiff(old strArray, new strArray, head int) {
 	}
 }
 
-func getWinSize() (int, int) {
-	size, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return int(size.Row), int(size.Col)
-}
-
 func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 	var oldline strArray
 	var newline strArray
@@ -293,8 +285,11 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 	var head int
 
 	for {
-		height, _ = getWinSize()
-		height = height - 1
+		winSize, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+		if err != nil {
+			log.Fatal(err)
+		}
+		height = int(winSize.Row) - 1
 		select {
 		case refresh := <-chanWrite.refresh:
 			if refresh {
