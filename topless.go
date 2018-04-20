@@ -327,6 +327,8 @@ func main() {
 	var interactive bool
 	var shell bool
 	var optCmd optToCmd
+	var err error
+	var orgLflag uint32
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
@@ -351,10 +353,20 @@ func main() {
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
 	chanWrite := stdinToWrite{make(chan bool), make(chan int)}
 
+	term, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), unix.TCGETS)
+	if err != nil {
+		log.Fatal(err)
+	}
+	orgLflag = term.Lflag
+
 	if !interactive {
-		runCriticalCmd("stty", "-F", "/dev/tty", "cbreak", "min", "1")
-		runCriticalCmd("stty", "-F", "/dev/tty", "-echo")
-		defer runCriticalCmd("stty", "-F", "/dev/tty", "echo")
+		term.Lflag &= ^(uint32(unix.ECHO) | uint32(unix.ICANON))
+		err = unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
+		if err != nil {
+			log.Fatal(err)
+		}
+		term.Lflag = orgLflag
+		defer unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
 		stdinChan := make(chan rune)
 		go treatStdin(stdinChan, chanCmd, chanWrite)
 		go getStdin(stdinChan)
@@ -362,7 +374,7 @@ func main() {
 
 	cmdoutChan := make(chan string)
 	go rewriteLines(cmdoutChan, chanWrite)
-	err := runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
+	err = runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
 	if err != nil {
 		os.Exit(1)
 	}
