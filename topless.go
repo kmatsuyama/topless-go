@@ -4,13 +4,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"golang.org/x/sys/unix"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 	"unicode/utf8"
+	"./ioctl"
 )
 
 const (
@@ -296,7 +296,7 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 	var head int
 
 	for {
-		winSize, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+		winSize, err := ioctl.GetWinsize()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -330,12 +330,12 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 	}
 }
 
+
 func main() {
 	var interactive bool
 	var shell bool
 	var optCmd optToCmd
 	var err error
-	var orgLflag uint32
 	var ret int
 
 	flag.Usage = func() {
@@ -361,15 +361,13 @@ func main() {
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
 	chanWrite := stdinToWrite{make(chan bool), make(chan int)}
 
-	term, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), unix.TCGETS)
+	err = ioctl.SetOrgTermios()
 	if err != nil {
 		log.Fatal(err)
 	}
-	orgLflag = term.Lflag
 
 	if !interactive {
-		term.Lflag &= ^(uint32(unix.ECHO) | uint32(unix.ICANON))
-		err = unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
+		err = ioctl.ChangeTermiosLflag(^(ioctl.ECHO|ioctl.ICANNON))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -384,8 +382,7 @@ func main() {
 	if err != nil {
 		ret = 1
 	}
-	term.Lflag = orgLflag
-	err = unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
+	err = ioctl.ResetTermiosLflag()
 	if err != nil {
 		log.Fatal(err)
 	}
