@@ -32,6 +32,8 @@ const (
 	Delete  = 'K'
 	Forward = 'S'
 	Back    = 'T'
+	CtrlD   = '\004'
+	CtrlU   = '\025'
 )
 
 type strArray struct {
@@ -134,6 +136,10 @@ func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd, chanWrite stdinToWrit
 			chanCmd.wait <- wait
 		case 'r':
 			chanWrite.refresh <- true
+		case CtrlD:
+			chanWrite.head <- +10
+		case CtrlU:
+			chanWrite.head <- -10
 		case '\033':
 			stdin2 := <-stdinChan
 			switch stdin2 {
