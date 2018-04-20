@@ -168,17 +168,6 @@ func runCmdstr(cmdstr ...string) (string, error) {
 	return string(out), err
 }
 
-func runCriticalCmd(cmdstr ...string) string {
-	out, err := runCmdstr(cmdstr[0:]...)
-	if err != nil {
-		if out != "" {
-			log.Print(out)
-		}
-		log.Fatal(err)
-	}
-	return out
-}
-
 func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, optCmd optToCmd) error {
 	var cmdout string
 	var err error
