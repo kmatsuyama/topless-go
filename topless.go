@@ -329,6 +329,7 @@ func main() {
 	var optCmd optToCmd
 	var err error
 	var orgLflag uint32
+	var ret int
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
@@ -365,8 +366,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		term.Lflag = orgLflag
-		defer unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
 		stdinChan := make(chan rune)
 		go treatStdin(stdinChan, chanCmd, chanWrite)
 		go getStdin(stdinChan)
@@ -376,6 +375,12 @@ func main() {
 	go rewriteLines(cmdoutChan, chanWrite)
 	err = runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
 	if err != nil {
-		os.Exit(1)
+		ret = 1
 	}
+	term.Lflag = orgLflag
+	err = unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Exit(ret)
 }
