@@ -60,13 +60,13 @@ type stdinToWrite struct {
 func newStrArray(str string, delim string, height int) strArray {
 	elem := strings.Split(str, delim)
 	orgLen := len(elem)
-	len := orgLen
-	if len > height {
-		len = height
+	length := orgLen
+	if length > height {
+		length = height
 	}
 	return strArray{
 		elem:   elem,
-		len:    len,
+		len:    length,
 		orgLen: orgLen,
 	}
 }
