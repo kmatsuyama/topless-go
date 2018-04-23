@@ -13,6 +13,7 @@ import (
 
 const (
 	StdinBuf = 128
+	SleepSecDef = 1
 )
 
 const (
@@ -51,7 +52,7 @@ type strArray struct {
 }
 
 type optToCmd struct {
-	sleepSec uint
+	sleepSec float64
 	force    bool
 }
 
@@ -148,7 +149,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	var wait bool
 	var exit bool
 
-	sleepTime := time.Duration(optCmd.sleepSec) * time.Second
+	sleepTime := time.Duration(optCmd.sleepSec * 1000) * time.Millisecond
 	for {
 		select {
 		case wait = <-chanCmd.wait:
@@ -310,7 +311,7 @@ func main() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.UintVar(&optCmd.sleepSec, "s", 1, "sleep second")
+	flag.Float64Var(&optCmd.sleepSec, "s", SleepSecDef, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
 	flag.BoolVar(&shell, "sh", false, "execute through the shell")
 	flag.BoolVar(&optCmd.force, "f", false, "ignore execute error")
