@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -133,12 +132,6 @@ func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanWrite stdinToWr
 
 func runCmdstr(cmdstr ...string) (string, error) {
 	var cmd *exec.Cmd
-
-	cmdlen := len(cmdstr)
-	if cmdlen == 0 {
-		return "", errors.New("Command not Found.")
-	}
-
 	switch len(cmdstr) {
 	case 1:
 		cmd = exec.Command(cmdstr[0])
