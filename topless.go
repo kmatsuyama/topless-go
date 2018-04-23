@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -131,25 +133,60 @@ func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanWrite stdinToWr
 	}
 }
 
-func runCmdstr(cmdstr ...string) (string, error) {
-	var cmd *exec.Cmd
-	switch len(cmdstr) {
-	case 1:
-		cmd = exec.Command(cmdstr[0])
-	default:
-		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
+func runCmdArray(cmdArray ...[]string) (string, error) {
+	var execArray []*exec.Cmd
+	var readArray []*io.PipeReader
+	var writeArray []*io.PipeWriter
+	var out bytes.Buffer
+	var err error
+	var i int
+	length := len(cmdArray)
+
+	for i = 0; i < length; i++ {
+		switch len(cmdArray[i]) {
+		case 1:
+			execArray = append(execArray, exec.Command(cmdArray[i][0]))
+		default:
+			execArray = append(execArray, exec.Command(cmdArray[i][0], cmdArray[i][1:]...))
+		}
+		if i != 0 {
+			execArray[i].Stdin = readArray[i-1]
+		}
+		if i < length-1 {
+			read, write := io.Pipe()
+			readArray = append(readArray, read)
+			writeArray = append(writeArray, write)
+			execArray[i].Stdout = writeArray[i]
+		} else {
+			execArray[i].Stdout = &out
+		}
 	}
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	for i = 0; i < length; i++ {
+		err = execArray[i].Start()
+		if err != nil {
+			return "", err
+		}
+	}
+	for i = 0; i < length-1; i++ {
+		err = execArray[i].Wait()
+		writeArray[i].Close()
+		if err != nil {
+			return "", err
+		}
+	}
+	err = execArray[length-1].Wait()
+	return out.String(), err
 }
 
 func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, optCmd optToCmd) error {
 	var cmdout string
+	var cmdArray [][]string
 	var err error
 	var wait bool
 	var exit bool
 
 	sleepTime := time.Duration(optCmd.sleepSec * 1000) * time.Millisecond
+	cmdArray = append(cmdArray, cmdstr)
 	for {
 		select {
 		case wait = <-chanCmd.wait:
@@ -163,7 +200,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 			time.Sleep(sleepTime)
 			continue
 		}
-		cmdout, err = runCmdstr(cmdstr[0:]...)
+		cmdout, err = runCmdArray(cmdArray...)
 		if !optCmd.force && err != nil {
 			if cmdout != "" {
 				fmt.Print(cmdout)
