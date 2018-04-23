@@ -9,8 +9,11 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-	"unicode/utf8"
 	"./ioctl"
+)
+
+const (
+	StdinBuf = 128
 )
 
 const (
@@ -32,12 +35,14 @@ const (
 	Delete  = 'K'
 	Forward = 'S'
 	Back    = 'T'
-	CtrlD   = '\004'
-	CtrlU   = '\025'
 )
 
 const (
-	CSI = "\033["
+	CSI     = "\033["
+	CtrlD   = "\004"
+	CtrlU   = "\025"
+	UpKey   = "\033[A"
+	DownKey = "\033[B"
 )
 
 type strArray struct {
@@ -102,58 +107,43 @@ func getByteLength(b byte) int {
 	return 0
 }
 
-func getStdin(stdinChan chan<- rune) {
-	var stdin []byte
-	var length int
-
-	input := make([]byte, 1)
+func getStdin(stdinChan chan<- string) {
+	var err error
 	for {
-		os.Stdin.Read(input)
-		stdin = append(stdin, input[0])
-		if length == 0 {
-			length = getByteLength(input[0])
+		input := make([]byte, StdinBuf)
+		n, err := os.Stdin.Read(input)
+		if err != nil {
+			break
 		}
-		length--
-		if length == 0 {
-			stdinR, _ := utf8.DecodeRune(stdin)
-			stdinChan <- stdinR
-			stdin = nil
-		} else if length < 0 {
-			length = 0
+		if n > 0 {
+			stdinChan <- string(input[:n])
 		}
 	}
 	close(stdinChan)
+	log.Fatal(err)
 }
 
-func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd, chanWrite stdinToWrite) {
+func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanWrite stdinToWrite) {
 	var wait bool
 	var exit bool
 	for stdin := range stdinChan {
 		switch stdin {
-		case 'q':
+		case "q":
 			exit = !exit
 			chanCmd.exit <- exit
-		case 'w':
+		case "w":
 			wait = !wait
 			chanCmd.wait <- wait
-		case 'r':
+		case "r":
 			chanWrite.refresh <- true
 		case CtrlD:
 			chanWrite.head <- +10
 		case CtrlU:
 			chanWrite.head <- -10
-		case '\033':
-			stdin2 := <-stdinChan
-			switch stdin2 {
-			case '[':
-				stdin3 := <-stdinChan
-				switch stdin3 {
-				case Up:
-					chanWrite.head <- -1
-				case Down:
-					chanWrite.head <- +1
-				}
-			}
+		case DownKey:
+			chanWrite.head <- +1
+		case UpKey:
+			chanWrite.head <- -1
 		}
 	}
 }
@@ -373,7 +363,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		stdinChan := make(chan rune)
+		stdinChan := make(chan string)
 		go treatStdin(stdinChan, chanCmd, chanWrite)
 		go getStdin(stdinChan)
 	}
