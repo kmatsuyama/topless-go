@@ -36,6 +36,10 @@ const (
 	CtrlU   = '\025'
 )
 
+const (
+	CSI = "\033["
+)
+
 type strArray struct {
 	elem   []string
 	len    int
@@ -72,8 +76,6 @@ func newStrArray(str string, delim string, height int) strArray {
 }
 
 func csiCode(ctrl rune, num ...int) string {
-	const CSI = "\033["
-
 	switch len(num) {
 	case 1:
 		return fmt.Sprintf("%s%d%c", CSI, num[0], ctrl)
