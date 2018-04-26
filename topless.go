@@ -252,19 +252,11 @@ func moveToBegin(len int) {
 	}
 }
 
-func printlnInWidth(line string, width int) {
+func wrapIn(width int, line string) string {
 	if len(line) > width {
-		fmt.Println(line[:width])
+		return line[:width]
 	} else {
-		fmt.Println(line)
-	}
-}
-
-func printInWidth(line string, width int) {
-	if len(line) > width {
-		fmt.Print(line[:width])
-	} else {
-		fmt.Print(line)
+		return line
 	}
 }
 
@@ -272,10 +264,10 @@ func printLine(line strArray, head int, width int) {
 	last := line.len + head - 1
 	for i := head; i < last; i++ {
 		fmt.Print(csiCode(Delete, All))
-		printlnInWidth(line.elem[i], width)
+		fmt.Println(wrapIn(width, line.elem[i]))
 	}
 	fmt.Print(csiCode(Delete, All))
-	printInWidth(line.elem[last], width)
+	fmt.Print(wrapIn(width, line.elem[last]))
 }
 
 func printLineDiff(old strArray, new strArray, head int, width int) {
@@ -287,9 +279,9 @@ func printLineDiff(old strArray, new strArray, head int, width int) {
 		}
 		fmt.Print(csiCode(Delete, All))
 		if i < last {
-			printlnInWidth(new.elem[i], width)
+			fmt.Println(wrapIn(width, new.elem[i]))
 		} else {
-			printInWidth(new.elem[i], width)
+			fmt.Print(wrapIn(width, new.elem[last]))
 		}
 	}
 }
