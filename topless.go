@@ -47,6 +47,17 @@ const (
 	DownKey = "\033[B"
 )
 
+const (
+	Normal  = "\x1B[0m"
+	Red     = "\x1B[31m"
+	Green   = "\x1B[32m"
+	Yellow  = "\x1B[33m"
+	Blue    = "\x1B[34m"
+	Magenta = "\x1B[35m"
+	Cyan    = "\x1B[36m"
+	White   = "\x1B[37m"
+)
+
 type strArray struct {
 	elem   []string
 	len    int
@@ -260,6 +271,10 @@ func wrapIn(width int, line string) string {
 	}
 }
 
+func coloring(color string, line string) string {
+	return color + line + Normal
+}
+
 func printLine(line strArray, head int, width int) {
 	last := line.len + head - 1
 	for i := head; i < last; i++ {
@@ -277,14 +292,14 @@ func printLineDiff(old strArray, new strArray, head int, width int) {
 			fmt.Print(csiCode(Below, 1))
 		} else {
 			fmt.Print(csiCode(Delete, All))
-			fmt.Println(wrapIn(width, new.elem[i]))
+			fmt.Println(coloring(Red, wrapIn(width, new.elem[i])))
 		}
 	}
 	if old.elem[last] == new.elem[last] {
 		fmt.Print(csiCode(Below, 1))
 	} else {
 		fmt.Print(csiCode(Delete, All))
-		fmt.Print(wrapIn(width, new.elem[last]))
+		fmt.Print(coloring(Red, wrapIn(width, new.elem[last])))
 	}
 }
 
