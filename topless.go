@@ -272,17 +272,19 @@ func printLine(line strArray, head int, width int) {
 
 func printLineDiff(old strArray, new strArray, head int, width int) {
 	last := new.len + head - 1
-	for i := head; i < last+1 ; i++ {
-		if i < old.len && new.elem[i] != "" && old.elem[i] == new.elem[i] {
+	for i := head; i < last; i++ {
+		if old.elem[i] == new.elem[i] {
 			fmt.Print(csiCode(Below, 1))
-			continue
-		}
-		fmt.Print(csiCode(Delete, All))
-		if i < last {
-			fmt.Println(wrapIn(width, new.elem[i]))
 		} else {
-			fmt.Print(wrapIn(width, new.elem[last]))
+			fmt.Print(csiCode(Delete, All))
+			fmt.Println(wrapIn(width, new.elem[i]))
 		}
+	}
+	if old.elem[last] == new.elem[last] {
+		fmt.Print(csiCode(Below, 1))
+	} else {
+		fmt.Print(csiCode(Delete, All))
+		fmt.Print(wrapIn(width, new.elem[last]))
 	}
 }
 
