@@ -144,16 +144,12 @@ func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanWrite stdinToWr
 	}
 }
 
-func runCmdArray(cmdArray ...[]string) (string, error) {
+func makeExecArray(cmdArray [][]string, length int) ([]*exec.Cmd, []*io.PipeReader, []*io.PipeWriter) {
 	var execArray []*exec.Cmd
 	var readArray []*io.PipeReader
 	var writeArray []*io.PipeWriter
-	var out bytes.Buffer
-	var err error
-	var i int
-	length := len(cmdArray)
 
-	for i = 0; i < length; i++ {
+	for i := 0; i < length; i++ {
 		switch len(cmdArray[i]) {
 		case 1:
 			execArray = append(execArray, exec.Command(cmdArray[i][0]))
@@ -168,10 +164,20 @@ func runCmdArray(cmdArray ...[]string) (string, error) {
 			readArray = append(readArray, read)
 			writeArray = append(writeArray, write)
 			execArray[i].Stdout = writeArray[i]
-		} else {
-			execArray[i].Stdout = &out
 		}
 	}
+	return execArray, readArray, writeArray
+}
+
+func runCmdArray(cmdArray [][]string) (string, error) {
+	var out bytes.Buffer
+	var err error
+	var i int
+	length := len(cmdArray)
+
+	execArray, _, writeArray := makeExecArray(cmdArray, length)
+	execArray[length-1].Stdout = &out
+
 	for i = 0; i < length; i++ {
 		err = execArray[i].Start()
 		if err != nil {
@@ -211,7 +217,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 			time.Sleep(sleepTime)
 			continue
 		}
-		cmdout, err = runCmdArray(cmdArray...)
+		cmdout, err = runCmdArray(cmdArray)
 		if !optCmd.force && err != nil {
 			if cmdout != "" {
 				fmt.Print(cmdout)
