@@ -16,6 +16,7 @@ import (
 const (
 	StdinBuf = 128
 	SleepSecDef = 1
+	CountMaxDef = 3
 )
 
 const (
@@ -62,6 +63,7 @@ type strArray struct {
 	elem   []string
 	len    int
 	orgLen int
+	count  []int
 }
 
 type optToCmd struct {
@@ -90,6 +92,7 @@ func newStrArray(str string, delim string, height int) strArray {
 		elem:   elem,
 		len:    length,
 		orgLen: orgLen,
+		count: make([]int, orgLen),
 	}
 }
 
@@ -291,22 +294,45 @@ func printLine(line strArray, head int, width int) {
 	fmt.Print(wrapIn(width, line.elem[last]))
 }
 
-func printLineDiff(old strArray, new strArray, head int, width int) {
+func checkLineCount(line strArray, i int) int {
+	if line.count[i] > 0 {
+		return line.count[i]-1
+	} else {
+		return line.count[i]
+	}
+}
+
+func printLineDiff(old strArray, new strArray, head int, width int) []int {
 	last := new.len + head - 1
 	for i := head; i < last; i++ {
 		if old.elem[i] == new.elem[i] {
-			fmt.Print(csiCode(Below, 1))
+			new.count[i] = checkLineCount(old, i)
+			if new.count[i] == 1 {
+				fmt.Print(csiCode(Delete, All))
+				fmt.Println(wrapIn(width, new.elem[i]))
+			} else {
+				fmt.Print(csiCode(Below, 1))
+			}
 		} else {
 			fmt.Print(csiCode(Delete, All))
 			fmt.Println(coloring(Red, wrapIn(width, new.elem[i])))
+			new.count[i] = CountMaxDef + 1
 		}
 	}
 	if old.elem[last] == new.elem[last] {
-		fmt.Print(csiCode(Below, 1))
+		new.count[last] = checkLineCount(old, last)
+		if new.count[last] == 1 {
+			fmt.Print(csiCode(Delete, All))
+			fmt.Println(wrapIn(width, new.elem[last]))
+		} else {
+			fmt.Print(csiCode(Below, 1))
+		}
 	} else {
 		fmt.Print(csiCode(Delete, All))
 		fmt.Print(coloring(Red, wrapIn(width, new.elem[last])))
+		new.count[last] = CountMaxDef + 1
 	}
+	return new.count
 }
 
 func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
@@ -344,13 +370,12 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 				printLine(newline, head, width)
 			} else {
 				moveToBegin(oldline.len)
-				printLineDiff(oldline, newline, head, width)
+				newline.count = printLineDiff(oldline, newline, head, width)
 			}
 			oldline = newline
 		}
 	}
 }
-
 
 func main() {
 	var interactive bool
