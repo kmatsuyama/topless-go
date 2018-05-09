@@ -248,27 +248,27 @@ func checkHead(line strArray, head int, dhead int, height int) int {
 	return head
 }
 
-func eraseToBegin(len int) {
-	if len == 0 {
+func eraseToBegin(length int) {
+	if length == 0 {
 		return
-	} else if len == 1 {
+	} else if length == 1 {
 		fmt.Print(csiCode(Delete, All))
 		fmt.Print(csiCode(Begin, 1))
 	} else {
-		for i := 0; i < len-1; i++ {
+		for i := 0; i < length-1; i++ {
 			fmt.Print(csiCode(Delete, All))
 			fmt.Print(csiCode(Above, 1))
 		}
 	}
 }
 
-func moveToBegin(len int) {
-	if len == 0 {
+func moveToBegin(length int) {
+	if length == 0 {
 		return
-	} else if len == 1 {
+	} else if length == 1 {
 		fmt.Print(csiCode(Begin, 1))
 	} else {
-		fmt.Print(csiCode(Above, len-1))
+		fmt.Print(csiCode(Above, length-1))
 	}
 }
 
@@ -302,37 +302,37 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printLineDiff(old strArray, new strArray, head int, width int) []int {
-	last := new.len + head - 1
+func printLineDiff(old strArray, line strArray, head int, width int) []int {
+	last := line.len + head - 1
 	for i := head; i < last; i++ {
-		if old.elem[i] == new.elem[i] {
-			new.count[i] = checkLineCount(old, i)
-			if new.count[i] == 1 {
+		if old.elem[i] == line.elem[i] {
+			line.count[i] = checkLineCount(old, i)
+			if line.count[i] == 1 {
 				fmt.Print(csiCode(Delete, All))
-				fmt.Println(wrapIn(width, new.elem[i]))
+				fmt.Println(wrapIn(width, line.elem[i]))
 			} else {
 				fmt.Print(csiCode(Below, 1))
 			}
 		} else {
 			fmt.Print(csiCode(Delete, All))
-			fmt.Println(coloring(Red, wrapIn(width, new.elem[i])))
-			new.count[i] = CountMaxDef + 1
+			fmt.Println(coloring(Red, wrapIn(width, line.elem[i])))
+			line.count[i] = CountMaxDef + 1
 		}
 	}
-	if old.elem[last] == new.elem[last] {
-		new.count[last] = checkLineCount(old, last)
-		if new.count[last] == 1 {
+	if old.elem[last] == line.elem[last] {
+		line.count[last] = checkLineCount(old, last)
+		if line.count[last] == 1 {
 			fmt.Print(csiCode(Delete, All))
-			fmt.Println(wrapIn(width, new.elem[last]))
+			fmt.Println(wrapIn(width, line.elem[last]))
 		} else {
 			fmt.Print(csiCode(Below, 1))
 		}
 	} else {
 		fmt.Print(csiCode(Delete, All))
-		fmt.Print(coloring(Red, wrapIn(width, new.elem[last])))
-		new.count[last] = CountMaxDef + 1
+		fmt.Print(coloring(Red, wrapIn(width, line.elem[last])))
+		line.count[last] = CountMaxDef + 1
 	}
-	return new.count
+	return line.count
 }
 
 func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
