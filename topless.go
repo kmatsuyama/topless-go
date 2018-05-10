@@ -286,7 +286,7 @@ func coloring(color string, line string) string {
 	return color + line + Normal
 }
 
-func printLine(line strArray, head int, width int) {
+func printNew(line strArray, head int, width int) {
 	last := line.len + head - 1
 	for i := head; i < last; i++ {
 		fmt.Print(csiCode(Delete, All))
@@ -306,7 +306,7 @@ func printAsIsLine(i int, line strArray, width int, print printFn) {
 	}
 }
 
-func printLineAsIs(line strArray, head int, width int) {
+func printAsIs(line strArray, head int, width int) {
 	last := line.len + head - 1
 	for i := head; i < last; i++ {
 		printAsIsLine(i, line, width, fmt.Println)
@@ -322,7 +322,7 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printDiffLine(i int, old strArray, line strArray, width int, print printFn) int {
+func printChangeLine(i int, old strArray, line strArray, width int, print printFn) int {
 	if old.elem[i] == line.elem[i] {
 		line.count[i] = checkLineCount(old, i)
 		if line.count[i] == 1 {
@@ -339,12 +339,12 @@ func printDiffLine(i int, old strArray, line strArray, width int, print printFn)
 	return line.count[i]
 }
 
-func printLineDiff(old strArray, line strArray, head int, width int) []int {
+func printChanges(old strArray, line strArray, head int, width int) []int {
 	last := line.len + head - 1
 	for i := head; i < last; i++ {
-		line.count[i] = printDiffLine(i, old, line, width, fmt.Println)
+		line.count[i] = printChangeLine(i, old, line, width, fmt.Println)
 	}
-	line.count[last] = printDiffLine(last, old, line, width, fmt.Print)
+	line.count[last] = printChangeLine(last, old, line, width, fmt.Print)
 	return line.count
 }
 
@@ -366,24 +366,24 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 		case refresh := <-chanWrite.refresh:
 			if refresh {
 				eraseToBegin(oldline.len)
-				printLine(oldline, head, width)
+				printNew(oldline, head, width)
 			}
 		case dhead := <-chanWrite.head:
 			newhead := checkHead(oldline, head, dhead, height)
 			if newhead != head {
 				head = newhead
 				eraseToBegin(oldline.len)
-				printLineAsIs(oldline, head, width)
+				printAsIs(oldline, head, width)
 			}
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n", height)
 			head = checkHead(newline, head, 0, height)
 			if oldline.len != newline.len {
 				eraseToBegin(oldline.len)
-				printLine(newline, head, width)
+				printNew(newline, head, width)
 			} else {
 				moveToBegin(oldline.len)
-				newline.count = printLineDiff(oldline, newline, head, width)
+				newline.count = printChanges(oldline, newline, head, width)
 			}
 			oldline = newline
 		}
