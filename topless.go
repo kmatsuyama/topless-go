@@ -296,6 +296,24 @@ func printLine(line strArray, head int, width int) {
 	fmt.Print(wrapIn(width, line.elem[last]))
 }
 
+func printAsIsLine(i int, line strArray, width int, print printFn) {
+	if line.count[i] > 1 {
+		fmt.Print(csiCode(Delete, All))
+		print(coloring(Red, wrapIn(width, line.elem[i])))
+	} else {
+		fmt.Print(csiCode(Delete, All))
+		print(wrapIn(width, line.elem[i]))
+	}
+}
+
+func printLineAsIs(line strArray, head int, width int) {
+	last := line.len + head - 1
+	for i := head; i < last; i++ {
+		printAsIsLine(i, line, width, fmt.Println)
+	}
+	printAsIsLine(last, line, width, fmt.Print)
+}
+
 func checkLineCount(line strArray, i int) int {
 	if line.count[i] > 0 {
 		return line.count[i]-1
@@ -355,7 +373,7 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 			if newhead != head {
 				head = newhead
 				eraseToBegin(oldline.len)
-				printLine(oldline, head, width)
+				printLineAsIs(oldline, head, width)
 			}
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n", height)
