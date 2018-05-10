@@ -81,6 +81,8 @@ type stdinToWrite struct {
 	head    chan int
 }
 
+type printFn func(...interface{}) (n int, err error)
+
 func newStrArray(str string, delim string, height int) strArray {
 	elem := strings.Split(str, delim)
 	orgLen := len(elem)
@@ -302,7 +304,7 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printDiffLine(i int, old strArray, line strArray, width int, last bool) int {
+func printDiffLine(i int, old strArray, line strArray, width int, print printFn) int {
 	if old.elem[i] == line.elem[i] {
 		line.count[i] = checkLineCount(old, i)
 		if line.count[i] == 1 {
@@ -313,11 +315,7 @@ func printDiffLine(i int, old strArray, line strArray, width int, last bool) int
 		}
 	} else {
 		fmt.Print(csiCode(Delete, All))
-		if last {
-			fmt.Print(coloring(Red, wrapIn(width, line.elem[i])))
-		} else {
-			fmt.Println(coloring(Red, wrapIn(width, line.elem[i])))
-		}
+		print(coloring(Red, wrapIn(width, line.elem[i])))
 		line.count[i] = CountMaxDef + 1
 	}
 	return line.count[i]
@@ -326,9 +324,9 @@ func printDiffLine(i int, old strArray, line strArray, width int, last bool) int
 func printLineDiff(old strArray, line strArray, head int, width int) []int {
 	last := line.len + head - 1
 	for i := head; i < last; i++ {
-		line.count[i] = printDiffLine(i, old, line, width, false)
+		line.count[i] = printDiffLine(i, old, line, width, fmt.Println)
 	}
-	line.count[last] = printDiffLine(last, old, line, width, true)
+	line.count[last] = printDiffLine(last, old, line, width, fmt.Print)
 	return line.count
 }
 
