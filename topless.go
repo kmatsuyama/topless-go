@@ -60,10 +60,10 @@ const (
 )
 
 type strArray struct {
-	elem   []string
-	len    int
-	orgLen int
-	count  []int
+	elem      []string
+	length    int
+	allLength int
+	count     []int
 }
 
 type optToCmd struct {
@@ -85,16 +85,16 @@ type printFn func(...interface{}) (n int, err error)
 
 func newStrArray(str string, delim string, height int) strArray {
 	elem := strings.Split(str, delim)
-	orgLen := len(elem)
-	length := orgLen
+	allLength := len(elem)
+	length := allLength
 	if length > height {
 		length = height
 	}
 	return strArray{
 		elem:   elem,
-		len:    length,
-		orgLen: orgLen,
-		count: make([]int, orgLen),
+		length:    length,
+		allLength: allLength,
+		count: make([]int, allLength),
 	}
 }
 
@@ -238,14 +238,14 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 }
 
 func checkHead(line strArray, head int, dhead int, height int) int {
-	if line.orgLen < height {
+	if line.allLength < height {
 		return 0
 	}
 	head = head + dhead
 	if head < 0 {
 		head = 0
-	} else if height+head > line.orgLen {
-		head = line.orgLen - height
+	} else if height+head > line.allLength {
+		head = line.allLength - height
 	}
 	return head
 }
@@ -287,7 +287,7 @@ func coloring(color string, line string) string {
 }
 
 func printNew(line strArray, head int, width int) {
-	last := line.len + head - 1
+	last := line.length + head - 1
 	for i := head; i < last; i++ {
 		fmt.Print(csiCode(Delete, All))
 		fmt.Println(wrapIn(width, line.elem[i]))
@@ -307,7 +307,7 @@ func printAsIsLine(i int, line strArray, width int, print printFn) {
 }
 
 func printAsIs(line strArray, head int, width int) {
-	last := line.len + head - 1
+	last := line.length + head - 1
 	for i := head; i < last; i++ {
 		printAsIsLine(i, line, width, fmt.Println)
 	}
@@ -340,7 +340,7 @@ func printChangeLine(i int, old strArray, line strArray, width int, print printF
 }
 
 func printChanges(old strArray, line strArray, head int, width int) []int {
-	last := line.len + head - 1
+	last := line.length + head - 1
 	for i := head; i < last; i++ {
 		line.count[i] = printChangeLine(i, old, line, width, fmt.Println)
 	}
@@ -365,24 +365,24 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 		select {
 		case refresh := <-chanWrite.refresh:
 			if refresh {
-				eraseToBegin(oldline.len)
+				eraseToBegin(oldline.length)
 				printNew(oldline, head, width)
 			}
 		case dhead := <-chanWrite.head:
 			newhead := checkHead(oldline, head, dhead, height)
 			if newhead != head {
 				head = newhead
-				eraseToBegin(oldline.len)
+				eraseToBegin(oldline.length)
 				printAsIs(oldline, head, width)
 			}
 		case cmdout = <-cmdoutChan:
 			newline = newStrArray(cmdout, "\n", height)
 			head = checkHead(newline, head, 0, height)
-			if oldline.len != newline.len {
-				eraseToBegin(oldline.len)
+			if oldline.length != newline.length {
+				eraseToBegin(oldline.length)
 				printNew(newline, head, width)
 			} else {
-				moveToBegin(oldline.len)
+				moveToBegin(oldline.length)
 				newline.count = printChanges(oldline, newline, head, width)
 			}
 			oldline = newline
