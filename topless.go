@@ -76,7 +76,7 @@ type stdinToCmd struct {
 	exit chan bool
 }
 
-type stdinToWrite struct {
+type stdinToPrint struct {
 	refresh chan bool
 	head    chan int
 }
@@ -124,7 +124,7 @@ func getStdin(stdinChan chan<- string) {
 	log.Fatal(err)
 }
 
-func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanWrite stdinToWrite) {
+func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanPrint stdinToPrint) {
 	var wait bool
 	var exit bool
 	for stdin := range stdinChan {
@@ -136,15 +136,15 @@ func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanWrite stdinToWr
 			wait = !wait
 			chanCmd.wait <- wait
 		case "r":
-			chanWrite.refresh <- true
+			chanPrint.refresh <- true
 		case CtrlD:
-			chanWrite.head <- +10
+			chanPrint.head <- +10
 		case CtrlU:
-			chanWrite.head <- -10
+			chanPrint.head <- -10
 		case DownKey:
-			chanWrite.head <- +1
+			chanPrint.head <- +1
 		case UpKey:
-			chanWrite.head <- -1
+			chanPrint.head <- -1
 		}
 	}
 }
@@ -348,7 +348,7 @@ func printChanges(oldLine strArray, line strArray, head int, width int) []int {
 	return line.count
 }
 
-func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
+func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 	var oldLine strArray
 	var line strArray
 	var cmdout string
@@ -363,12 +363,12 @@ func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
 		height = int(winSize.Row) - 1
 		width = int(winSize.Col)
 		select {
-		case refresh := <-chanWrite.refresh:
+		case refresh := <-chanPrint.refresh:
 			if refresh {
 				eraseToBegin(oldLine.length)
 				printNew(oldLine, head, width)
 			}
-		case dHead := <-chanWrite.head:
+		case dHead := <-chanPrint.head:
 			newHead := checkHead(oldLine, head, dHead, height)
 			if newHead != head {
 				head = newHead
@@ -418,7 +418,7 @@ func main() {
 	}
 
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
-	chanWrite := stdinToWrite{make(chan bool), make(chan int)}
+	chanPrint := stdinToPrint{make(chan bool), make(chan int)}
 
 	err = ioctl.SetOrgTermios()
 	if err != nil {
@@ -431,12 +431,12 @@ func main() {
 			log.Fatal(err)
 		}
 		stdinChan := make(chan string)
-		go treatStdin(stdinChan, chanCmd, chanWrite)
+		go treatStdin(stdinChan, chanCmd, chanPrint)
 		go getStdin(stdinChan)
 	}
 
 	cmdoutChan := make(chan string)
-	go rewriteLines(cmdoutChan, chanWrite)
+	go printRepeatedly(cmdoutChan, chanPrint)
 	err = runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
 	if err != nil {
 		ret = 1
