@@ -302,36 +302,33 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printLineDiff(old strArray, line strArray, head int, width int) []int {
-	last := line.len + head - 1
-	for i := head; i < last; i++ {
-		if old.elem[i] == line.elem[i] {
-			line.count[i] = checkLineCount(old, i)
-			if line.count[i] == 1 {
-				fmt.Print(csiCode(Delete, All))
-				fmt.Println(wrapIn(width, line.elem[i]))
-			} else {
-				fmt.Print(csiCode(Below, 1))
-			}
-		} else {
+func printDiffLine(i int, old strArray, line strArray, width int, last bool) int {
+	if old.elem[i] == line.elem[i] {
+		line.count[i] = checkLineCount(old, i)
+		if line.count[i] == 1 {
 			fmt.Print(csiCode(Delete, All))
-			fmt.Println(coloring(Red, wrapIn(width, line.elem[i])))
-			line.count[i] = CountMaxDef + 1
-		}
-	}
-	if old.elem[last] == line.elem[last] {
-		line.count[last] = checkLineCount(old, last)
-		if line.count[last] == 1 {
-			fmt.Print(csiCode(Delete, All))
-			fmt.Println(wrapIn(width, line.elem[last]))
+			fmt.Println(wrapIn(width, line.elem[i]))
 		} else {
 			fmt.Print(csiCode(Below, 1))
 		}
 	} else {
 		fmt.Print(csiCode(Delete, All))
-		fmt.Print(coloring(Red, wrapIn(width, line.elem[last])))
-		line.count[last] = CountMaxDef + 1
+		if last {
+			fmt.Print(coloring(Red, wrapIn(width, line.elem[i])))
+		} else {
+			fmt.Println(coloring(Red, wrapIn(width, line.elem[i])))
+		}
+		line.count[i] = CountMaxDef + 1
 	}
+	return line.count[i]
+}
+
+func printLineDiff(old strArray, line strArray, head int, width int) []int {
+	last := line.len + head - 1
+	for i := head; i < last; i++ {
+		line.count[i] = printDiffLine(i, old, line, width, false)
+	}
+	line.count[last] = printDiffLine(last, old, line, width, true)
 	return line.count
 }
 
