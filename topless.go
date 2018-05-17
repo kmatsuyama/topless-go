@@ -63,6 +63,7 @@ type strArray struct {
 	elem      []string
 	length    int
 	allLength int
+	width     int
 	count     []int
 }
 
@@ -83,7 +84,7 @@ type stdinToPrint struct {
 
 type printFn func(...interface{}) (n int, err error)
 
-func newStrArray(str string, delim string, height int) strArray {
+func newStrArray(str string, delim string, height int, width int) strArray {
 	elem := strings.Split(str, delim)
 	allLength := len(elem)
 	length := allLength
@@ -94,6 +95,7 @@ func newStrArray(str string, delim string, height int) strArray {
 		elem:   elem,
 		length:    length,
 		allLength: allLength,
+		width: width,
 		count: make([]int, allLength),
 	}
 }
@@ -286,32 +288,32 @@ func coloring(color string, line string) string {
 	return color + line + Normal
 }
 
-func printNew(line strArray, head int, width int) {
+func printNew(line strArray, head int) {
 	last := line.length + head - 1
 	for i := head; i < last; i++ {
 		fmt.Print(csiCode(Delete, All))
-		fmt.Println(wrapIn(width, line.elem[i]))
+		fmt.Println(wrapIn(line.width, line.elem[i]))
 	}
 	fmt.Print(csiCode(Delete, All))
-	fmt.Print(wrapIn(width, line.elem[last]))
+	fmt.Print(wrapIn(line.width, line.elem[last]))
 }
 
-func printAsIsLine(i int, line strArray, width int, print printFn) {
+func printAsIsLine(i int, line strArray, print printFn) {
 	if line.count[i] > 1 {
 		fmt.Print(csiCode(Delete, All))
-		print(coloring(Red, wrapIn(width, line.elem[i])))
+		print(coloring(Red, wrapIn(line.width, line.elem[i])))
 	} else {
 		fmt.Print(csiCode(Delete, All))
-		print(wrapIn(width, line.elem[i]))
+		print(wrapIn(line.width, line.elem[i]))
 	}
 }
 
-func printAsIs(line strArray, head int, width int) {
+func printAsIs(line strArray, head int) {
 	last := line.length + head - 1
 	for i := head; i < last; i++ {
-		printAsIsLine(i, line, width, fmt.Println)
+		printAsIsLine(i, line, fmt.Println)
 	}
-	printAsIsLine(last, line, width, fmt.Print)
+	printAsIsLine(last, line, fmt.Print)
 }
 
 func checkLineCount(line strArray, i int) int {
@@ -322,29 +324,29 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printChangeLine(i int, oldLine strArray, line strArray, width int, print printFn) int {
+func printChangeLine(i int, oldLine strArray, line strArray, print printFn) int {
 	if oldLine.elem[i] == line.elem[i] {
 		line.count[i] = checkLineCount(oldLine, i)
 		if line.count[i] == 1 {
 			fmt.Print(csiCode(Delete, All))
-			fmt.Println(wrapIn(width, line.elem[i]))
+			fmt.Println(wrapIn(line.width, line.elem[i]))
 		} else {
 			fmt.Print(csiCode(Below, 1))
 		}
 	} else {
 		fmt.Print(csiCode(Delete, All))
-		print(coloring(Red, wrapIn(width, line.elem[i])))
+		print(coloring(Red, wrapIn(line.width, line.elem[i])))
 		line.count[i] = CountMaxDef + 1
 	}
 	return line.count[i]
 }
 
-func printChanges(oldLine strArray, line strArray, head int, width int) []int {
+func printChanges(oldLine strArray, line strArray, head int) []int {
 	last := line.length + head - 1
 	for i := head; i < last; i++ {
-		line.count[i] = printChangeLine(i, oldLine, line, width, fmt.Println)
+		line.count[i] = printChangeLine(i, oldLine, line, fmt.Println)
 	}
-	line.count[last] = printChangeLine(last, oldLine, line, width, fmt.Print)
+	line.count[last] = printChangeLine(last, oldLine, line, fmt.Print)
 	return line.count
 }
 
@@ -366,24 +368,24 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 		case refresh := <-chanPrint.refresh:
 			if refresh {
 				eraseToBegin(oldLine.length)
-				printNew(oldLine, head, width)
+				printNew(oldLine, head)
 			}
 		case dHead := <-chanPrint.head:
 			newHead := checkHead(oldLine, head, dHead, height)
 			if newHead != head {
 				head = newHead
 				eraseToBegin(oldLine.length)
-				printAsIs(oldLine, head, width)
+				printAsIs(oldLine, head)
 			}
 		case cmdout = <-cmdoutChan:
-			line = newStrArray(cmdout, "\n", height)
+			line = newStrArray(cmdout, "\n", height, width)
 			head = checkHead(line, head, 0, height)
 			if oldLine.length != line.length {
 				eraseToBegin(oldLine.length)
-				printNew(line, head, width)
+				printNew(line, head)
 			} else {
 				moveToBegin(oldLine.length)
-				line.count = printChanges(oldLine, line, head, width)
+				line.count = printChanges(oldLine, line, head)
 			}
 			oldLine = line
 		}
