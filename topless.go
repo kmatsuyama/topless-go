@@ -83,6 +83,7 @@ type stdinToPrint struct {
 }
 
 type printFn func(...interface{}) (n int, err error)
+type printLine func(int, strArray, printFn) ()
 
 func newStrArray(str string, delim string, height int, width int) strArray {
 	elem := strings.Split(str, delim)
@@ -287,17 +288,12 @@ func coloring(color string, line string) string {
 	return color + line + Normal
 }
 
-func printNew(line strArray, head int) {
-	last := line.height + head - 1
-	for i := head; i < last; i++ {
-		fmt.Print(csiCode(Delete, All))
-		fmt.Println(wrapIn(line.width, line.elem[i]))
-	}
+func printNew(i int, line strArray, print printFn) {
 	fmt.Print(csiCode(Delete, All))
-	fmt.Print(wrapIn(line.width, line.elem[last]))
+	print(wrapIn(line.width, line.elem[i]))
 }
 
-func printAsIsLine(i int, line strArray, print printFn) {
+func printAsIs(i int, line strArray, print printFn) {
 	if line.count[i] > 1 {
 		fmt.Print(csiCode(Delete, All))
 		print(coloring(Red, wrapIn(line.width, line.elem[i])))
@@ -307,12 +303,12 @@ func printAsIsLine(i int, line strArray, print printFn) {
 	}
 }
 
-func printAsIs(line strArray, head int) {
+func printLines(line strArray, head int, print printLine) {
 	last := line.height + head - 1
 	for i := head; i < last; i++ {
-		printAsIsLine(i, line, fmt.Println)
+		print(i, line, fmt.Println)
 	}
-	printAsIsLine(last, line, fmt.Print)
+	print(last, line, fmt.Print)
 }
 
 func checkLineCount(line strArray, i int) int {
@@ -367,21 +363,21 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 		case refresh := <-chanPrint.refresh:
 			if refresh {
 				eraseToBegin(oldLine.height)
-				printNew(oldLine, head)
+				printLines(oldLine, head, printNew)
 			}
 		case dHead := <-chanPrint.head:
 			newHead := checkHead(oldLine, head, dHead, height)
 			if newHead != head {
 				head = newHead
 				eraseToBegin(oldLine.height)
-				printAsIs(oldLine, head)
+				printLines(oldLine, head, printAsIs)
 			}
 		case cmdout = <-cmdoutChan:
 			line = newStrArray(cmdout, "\n", height, width)
 			head = checkHead(line, head, 0, height)
 			if oldLine.height != line.height {
 				eraseToBegin(oldLine.height)
-				printNew(line, head)
+				printLines(line, head, printNew)
 			} else {
 				moveToBegin(oldLine.height)
 				line.count = printChanges(oldLine, line, head)
