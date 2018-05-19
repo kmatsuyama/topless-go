@@ -319,7 +319,7 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printChangeLine(i int, oldLine strArray, line strArray, print printFn) int {
+func printChangeLine(i int, oldLine strArray, line strArray, print printFn) strArray {
 	if oldLine.elem[i] == line.elem[i] {
 		line.count[i] = checkLineCount(oldLine, i)
 		if line.count[i] == 1 {
@@ -333,16 +333,16 @@ func printChangeLine(i int, oldLine strArray, line strArray, print printFn) int 
 		print(coloring(Red, wrapIn(line.width, line.elem[i])))
 		line.count[i] = CountMaxDef + 1
 	}
-	return line.count[i]
+	return line
 }
 
-func printChanges(oldLine strArray, line strArray, head int) []int {
+func printChanges(oldLine strArray, line strArray, head int) strArray {
 	last := line.height + head - 1
 	for i := head; i < last; i++ {
-		line.count[i] = printChangeLine(i, oldLine, line, fmt.Println)
+		line = printChangeLine(i, oldLine, line, fmt.Println)
 	}
-	line.count[last] = printChangeLine(last, oldLine, line, fmt.Print)
-	return line.count
+	line = printChangeLine(last, oldLine, line, fmt.Print)
+	return line
 }
 
 func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
@@ -380,7 +380,7 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 				printLines(line, head, printNew)
 			} else {
 				moveToBegin(oldLine.height)
-				line.count = printChanges(oldLine, line, head)
+				line = printChanges(oldLine, line, head)
 			}
 			oldLine = line
 		}
