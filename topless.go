@@ -262,6 +262,13 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	return err
 }
 
+func min(a, b int) int {
+   if a > b {
+      return b
+   }
+   return a
+}
+
 func checkHead(line strArray, head int, dhead int, height int) int {
 	if line.length < height {
 		return 0
@@ -316,11 +323,8 @@ func colorDiff(orgColor string, color string, oldLine string, line string) strin
 
 	colorStr := coloring(orgColor, line)
 	num := len(orgColor)
-	length := len(line)
-	if len(oldLine) < length {
-		length = len(oldLine)
-	}
-	for i := 0; i < length; i++ {
+
+	for i := 0; i < min(len(oldLine), len(line)); i++ {
 		if line[i] == oldLine[i] && !same {
 			colorStr = colorStr[:num] + Normal + orgColor + colorStr[num:]
 			num += len(Normal + orgColor)
@@ -379,11 +383,7 @@ func checkLineCount(line strArray, i int) int {
 }
 
 func checkChangeLine(oldLine strArray, line strArray) strArray {
-	length := line.length
-	if oldLine.length < length {
-		length = oldLine.length
-	}
-	for i := 0; i < length; i++ {
+	for i := 0; i < min(oldLine.length, line.length); i++ {
 		if oldLine.elem[i] == line.elem[i] {
 			line.count[i] = checkLineCount(oldLine, i)
 			if line.count[i] > 1 {
