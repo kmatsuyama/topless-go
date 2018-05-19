@@ -215,7 +215,7 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 				stdout.Lines(oldLine, head, stdout.AsIs)
 			}
 		case cmdout = <-cmdoutChan:
-			line = stdout.NewStrArray(cmdout, "\n", height, width)
+			line = stdout.NewStrArray(cmdout, "\n", height, width, CountMaxDef)
 			head = stdout.CheckHead(line, head, 0, height)
 			if oldLine.Height != line.Height {
 				stdout.EraseUp(oldLine.Height)

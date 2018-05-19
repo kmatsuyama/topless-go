@@ -62,10 +62,6 @@ const (
 	All    = 2
 )
 
-const (
-	CountMaxDef = 3
-)
-
 type StrArray struct {
 	elem      []string
 	colorElem []string
@@ -73,12 +69,13 @@ type StrArray struct {
 	Height    int
 	width     int
 	count     []int
+	countMax  int
 }
 
 type printFn func(...interface{}) (n int, err error)
 type printLine func(int, StrArray, printFn) ()
 
-func NewStrArray(str string, delim string, height int, width int) StrArray {
+func NewStrArray(str string, delim string, height int, width int, countMax int) StrArray {
 	elem := strings.Split(str, delim)
 	length := len(elem)
 	if length < height {
@@ -91,6 +88,7 @@ func NewStrArray(str string, delim string, height int, width int) StrArray {
 		Height: height,
 		width: width,
 		count: make([]int, length),
+		countMax: countMax,
 	}
 }
 
@@ -152,7 +150,7 @@ func AsIs(i int, line StrArray, printF printFn) {
 }
 
 func Changes(i int, line StrArray, printF printFn) {
-	if line.count[i] == CountMaxDef + 1 {
+	if line.count[i] == line.countMax + 1 {
 		fmt.Print(csiCode(Delete, All))
 		printF(line.colorElem[i])
 	} else if line.count[i] == 1 {
@@ -233,7 +231,7 @@ func CheckChange(oldLine StrArray, line StrArray) StrArray {
 			}
 		} else {
 			line.colorElem[i] = colorDiff(Red, Red_, wrapIn(oldLine.width, oldLine.elem[i]),  wrapIn(line.width, line.elem[i]))
-			line.count[i] = CountMaxDef + 1
+			line.count[i] = line.countMax + 1
 		}
 	}
 	return line
