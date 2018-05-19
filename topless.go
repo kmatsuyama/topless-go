@@ -61,6 +61,7 @@ const (
 
 type strArray struct {
 	elem      []string
+	colorElem []string
 	length    int
 	height    int
 	width     int
@@ -93,6 +94,7 @@ func newStrArray(str string, delim string, height int, width int) strArray {
 	}
 	return strArray{
 		elem:   elem,
+		colorElem:  make([]string, length),
 		length: length,
 		height: height,
 		width: width,
@@ -296,10 +298,22 @@ func printNew(i int, line strArray, print printFn) {
 func printAsIs(i int, line strArray, print printFn) {
 	if line.count[i] > 1 {
 		fmt.Print(csiCode(Delete, All))
-		print(coloring(Red, wrapIn(line.width, line.elem[i])))
+		print(line.colorElem[i])
 	} else {
 		fmt.Print(csiCode(Delete, All))
 		print(wrapIn(line.width, line.elem[i]))
+	}
+}
+
+func printChanges(i int, line strArray, print printFn) {
+	if line.count[i] == CountMaxDef + 1 {
+		fmt.Print(csiCode(Delete, All))
+		print(line.colorElem[i])
+	} else if line.count[i] == 1 {
+		fmt.Print(csiCode(Delete, All))
+		print(wrapIn(line.width, line.elem[i]))
+	} else {
+		fmt.Print(csiCode(Below, 1))
 	}
 }
 
@@ -319,29 +333,22 @@ func checkLineCount(line strArray, i int) int {
 	}
 }
 
-func printChangeLine(i int, oldLine strArray, line strArray, print printFn) strArray {
-	if oldLine.elem[i] == line.elem[i] {
-		line.count[i] = checkLineCount(oldLine, i)
-		if line.count[i] == 1 {
-			fmt.Print(csiCode(Delete, All))
-			fmt.Println(wrapIn(line.width, line.elem[i]))
+func checkChangeLine(oldLine strArray, line strArray) strArray {
+	length := line.length
+	if oldLine.length < length {
+		length = oldLine.length
+	}
+	for i := 0; i < length; i++ {
+		if oldLine.elem[i] == line.elem[i] {
+			line.count[i] = checkLineCount(oldLine, i)
+			if line.count[i] > 1 {
+				line.colorElem[i] = oldLine.colorElem[i]
+			}
 		} else {
-			fmt.Print(csiCode(Below, 1))
+			line.colorElem[i] = coloring(Red, wrapIn(line.width, line.elem[i]))
+			line.count[i] = CountMaxDef + 1
 		}
-	} else {
-		fmt.Print(csiCode(Delete, All))
-		print(coloring(Red, wrapIn(line.width, line.elem[i])))
-		line.count[i] = CountMaxDef + 1
 	}
-	return line
-}
-
-func printChanges(oldLine strArray, line strArray, head int) strArray {
-	last := line.height + head - 1
-	for i := head; i < last; i++ {
-		line = printChangeLine(i, oldLine, line, fmt.Println)
-	}
-	line = printChangeLine(last, oldLine, line, fmt.Print)
 	return line
 }
 
@@ -379,8 +386,9 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 				eraseToBegin(oldLine.height)
 				printLines(line, head, printNew)
 			} else {
+				line = checkChangeLine(oldLine, line)
 				moveToBegin(oldLine.height)
-				line = printChanges(oldLine, line, head)
+				printLines(line, head, printChanges)
 			}
 			oldLine = line
 		}
