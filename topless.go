@@ -57,6 +57,27 @@ const (
 	Magenta = "\x1B[35m"
 	Cyan    = "\x1B[36m"
 	White   = "\x1B[37m"
+	BgRed     = "\x1B[41m"
+	BgGreen   = "\x1B[42m"
+	BgYellow  = "\x1B[43m"
+	BgBlue    = "\x1B[44m"
+	BgMagenta = "\x1B[45m"
+	BgCyan    = "\x1B[46m"
+	BgWhite   = "\x1B[47m"
+	RedB     = "\x1B[31;1m"
+	GreenB   = "\x1B[32;1m"
+	YellowB  = "\x1B[33;1m"
+	BlueB    = "\x1B[34;1m"
+	MagentaB = "\x1B[35;1m"
+	CyanB    = "\x1B[36;1m"
+	WhiteB   = "\x1B[37;1m"
+	Red_     = "\x1B[31;4m"
+	Green_   = "\x1B[32;4m"
+	Yellow_  = "\x1B[33;4m"
+	Blue_    = "\x1B[34;4m"
+	Magenta_ = "\x1B[35;4m"
+	Cyan_    = "\x1B[36;4m"
+	White_   = "\x1B[37;1m"
 )
 
 type strArray struct {
@@ -290,6 +311,30 @@ func coloring(color string, line string) string {
 	return color + line + Normal
 }
 
+func colorDiff(orgColor string, color string, oldLine string, line string) string {
+	var same bool
+
+	colorStr := coloring(orgColor, line)
+	num := len(orgColor)
+	length := len(line)
+	if len(oldLine) < length {
+		length = len(oldLine)
+	}
+	for i := 0; i < length; i++ {
+		if line[i] == oldLine[i] && !same {
+			colorStr = colorStr[:num] + Normal + orgColor + colorStr[num:]
+			num += len(Normal + orgColor)
+			same = true
+		} else if line[i] != oldLine[i] && same {
+			colorStr = colorStr[:num] + color + colorStr[num:]
+			num += len(color)
+			same = false
+		}
+		num++
+	}
+	return colorStr
+}
+
 func printNew(i int, line strArray, print printFn) {
 	fmt.Print(csiCode(Delete, All))
 	print(wrapIn(line.width, line.elem[i]))
@@ -345,7 +390,7 @@ func checkChangeLine(oldLine strArray, line strArray) strArray {
 				line.colorElem[i] = oldLine.colorElem[i]
 			}
 		} else {
-			line.colorElem[i] = coloring(Red, wrapIn(line.width, line.elem[i]))
+			line.colorElem[i] = colorDiff(Red, Red_, wrapIn(oldLine.width, oldLine.elem[i]),  wrapIn(line.width, line.elem[i]))
 			line.count[i] = CountMaxDef + 1
 		}
 	}
