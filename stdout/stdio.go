@@ -66,7 +66,7 @@ type StrArray struct {
 	elem      []string
 	colorElem []string
 	length    int
-	Height    int
+	height    int
 	width     int
 	count     []int
 	countMax  int
@@ -85,11 +85,15 @@ func NewStrArray(str string, delim string, height int, width int, countMax int) 
 		elem:   elem,
 		colorElem:  make([]string, length),
 		length: length,
-		Height: height,
+		height: height,
 		width: width,
 		count: make([]int, length),
 		countMax: countMax,
 	}
+}
+
+func IsSameHeight(oldLine StrArray, line StrArray) bool {
+	return oldLine.height == line.height
 }
 
 func csiCode(ctrl rune, num ...int) string {
@@ -102,7 +106,11 @@ func csiCode(ctrl rune, num ...int) string {
 	return ""
 }
 
-func EraseUp(length int) {
+func Erase(line StrArray) {
+	eraseUp(line.height)
+}
+
+func eraseUp(length int) {
 	if length == 0 {
 		return
 	} else if length == 1 {
@@ -116,7 +124,11 @@ func EraseUp(length int) {
 	}
 }
 
-func MoveUp(length int) {
+func BackToTop(line StrArray) {
+	moveUp(line.height)
+}
+
+func moveUp(length int) {
 	if length == 0 {
 		return
 	} else if length == 1 {
@@ -162,7 +174,7 @@ func Changes(i int, line StrArray, printF printFn) {
 }
 
 func Lines(line StrArray, head int, printL printLine) {
-	last := line.Height + head - 1
+	last := line.height + head - 1
 	for i := head; i < last; i++ {
 		printL(i, line, fmt.Println)
 	}

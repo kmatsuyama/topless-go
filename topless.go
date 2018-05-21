@@ -204,25 +204,25 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 		select {
 		case refresh := <-chanPrint.refresh:
 			if refresh {
-				stdout.EraseUp(oldLine.Height)
+				stdout.Erase(oldLine)
 				stdout.Lines(oldLine, head, stdout.New)
 			}
 		case dHead := <-chanPrint.head:
 			newHead := stdout.CheckHead(oldLine, head, dHead, height)
 			if newHead != head {
 				head = newHead
-				stdout.EraseUp(oldLine.Height)
+				stdout.Erase(oldLine)
 				stdout.Lines(oldLine, head, stdout.AsIs)
 			}
 		case cmdout = <-cmdoutChan:
 			line = stdout.NewStrArray(cmdout, "\n", height, width, CountMaxDef)
 			head = stdout.CheckHead(line, head, 0, height)
-			if oldLine.Height != line.Height {
-				stdout.EraseUp(oldLine.Height)
+			if !stdout.IsSameHeight(oldLine, line) {
+				stdout.Erase(oldLine)
 				stdout.Lines(line, head, stdout.New)
 			} else {
 				line = stdout.CheckChange(oldLine, line)
-				stdout.MoveUp(oldLine.Height)
+				stdout.BackToTop(oldLine)
 				stdout.Lines(line, head, stdout.Changes)
 			}
 			oldLine = line
