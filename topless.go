@@ -1,22 +1,23 @@
 package main
 
 import (
-	"errors"
+	"bytes"
 	"flag"
 	"fmt"
-	"golang.org/x/sys/unix"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-	"unicode/utf8"
+	"./ioctl"
+	"./stdout"
 )
 
 const (
-	Before = 0
-	After  = 1
-	All    = 2
+	StdinBuf = 128
+	SleepSecDef = 1
+	CountMaxDef = 3
 )
 
 const (
@@ -32,18 +33,18 @@ const (
 	Delete  = 'K'
 	Forward = 'S'
 	Back    = 'T'
-	CtrlD   = '\004'
-	CtrlU   = '\025'
 )
 
-type strArray struct {
-	elem   []string
-	len    int
-	orgLen int
-}
+const (
+	CSI     = "\033["
+	CtrlD   = "\004"
+	CtrlU   = "\025"
+	UpKey   = "\033[A"
+	DownKey = "\033[B"
+)
 
 type optToCmd struct {
-	sleepSec uint
+	sleepSec float64
 	force    bool
 }
 
@@ -52,135 +53,112 @@ type stdinToCmd struct {
 	exit chan bool
 }
 
-type stdinToWrite struct {
+type stdinToPrint struct {
 	refresh chan bool
 	head    chan int
 }
 
-func newStrArray(str string, delim string, height int) strArray {
-	elem := strings.Split(str, delim)
-	orgLen := len(elem)
-	length := orgLen
-	if length > height {
-		length = height
-	}
-	return strArray{
-		elem:   elem,
-		len:    length,
-		orgLen: orgLen,
-	}
-}
-
-func csiCode(ctrl rune, num ...int) string {
-	const CSI = "\033["
-
-	switch len(num) {
-	case 1:
-		return fmt.Sprintf("%s%d%c", CSI, num[0], ctrl)
-	case 2:
-		return fmt.Sprintf("%s%d;%d%c", CSI, num[0], num[1], ctrl)
-	}
-	return ""
-}
-
-func getByteLength(b byte) int {
-	if b < 0x80 {
-		return 1
-	} else if 0xc2 <= b && b < 0xe0 {
-		return 2
-	} else if 0xe0 <= b && b < 0xf0 {
-		return 3
-	} else if 0xf0 <= b && b < 0xf8 {
-		return 4
-	} else if 0xf8 <= b && b < 0xfc {
-		return 5
-	} else if 0xfc <= b && b < 0xfd {
-		return 6
-	}
-	return 0
-}
-
-func getStdin(stdinChan chan<- rune) {
-	var stdin []byte
-	var length int
-
-	input := make([]byte, 1)
+func getStdin(stdinChan chan<- string) {
+	var err error
 	for {
-		os.Stdin.Read(input)
-		stdin = append(stdin, input[0])
-		if length == 0 {
-			length = getByteLength(input[0])
+		input := make([]byte, StdinBuf)
+		n, err := os.Stdin.Read(input)
+		if err != nil {
+			break
 		}
-		length--
-		if length == 0 {
-			stdinR, _ := utf8.DecodeRune(stdin)
-			stdinChan <- stdinR
-			stdin = nil
-		} else if length < 0 {
-			length = 0
+		if n > 0 {
+			stdinChan <- string(input[:n])
 		}
 	}
 	close(stdinChan)
+	log.Fatal(err)
 }
 
-func treatStdin(stdinChan <-chan rune, chanCmd stdinToCmd, chanWrite stdinToWrite) {
+func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanPrint stdinToPrint) {
 	var wait bool
 	var exit bool
 	for stdin := range stdinChan {
 		switch stdin {
-		case 'q':
+		case "q":
 			exit = !exit
 			chanCmd.exit <- exit
-		case 'w':
+		case "w":
 			wait = !wait
 			chanCmd.wait <- wait
-		case 'r':
-			chanWrite.refresh <- true
+		case "r":
+			chanPrint.refresh <- true
 		case CtrlD:
-			chanWrite.head <- +10
+			chanPrint.head <- +10
 		case CtrlU:
-			chanWrite.head <- -10
-		case '\033':
-			stdin2 := <-stdinChan
-			switch stdin2 {
-			case '[':
-				stdin3 := <-stdinChan
-				switch stdin3 {
-				case Up:
-					chanWrite.head <- -1
-				case Down:
-					chanWrite.head <- +1
-				}
-			}
+			chanPrint.head <- -10
+		case DownKey:
+			chanPrint.head <- +1
+		case UpKey:
+			chanPrint.head <- -1
 		}
 	}
 }
 
-func runCmdstr(cmdstr ...string) (string, error) {
-	var cmd *exec.Cmd
+func makeExecArray(cmdArray [][]string, length int) ([]*exec.Cmd, []*io.PipeReader, []*io.PipeWriter) {
+	var execArray []*exec.Cmd
+	var readArray []*io.PipeReader
+	var writeArray []*io.PipeWriter
 
-	cmdlen := len(cmdstr)
-	if cmdlen == 0 {
-		return "", errors.New("Command not Found.")
+	for i := 0; i < length; i++ {
+		switch len(cmdArray[i]) {
+		case 1:
+			execArray = append(execArray, exec.Command(cmdArray[i][0]))
+		default:
+			execArray = append(execArray, exec.Command(cmdArray[i][0], cmdArray[i][1:]...))
+		}
+		if i != 0 {
+			execArray[i].Stdin = readArray[i-1]
+		}
+		if i < length-1 {
+			read, write := io.Pipe()
+			readArray = append(readArray, read)
+			writeArray = append(writeArray, write)
+			execArray[i].Stdout = writeArray[i]
+		}
 	}
+	return execArray, readArray, writeArray
+}
 
-	switch len(cmdstr) {
-	case 1:
-		cmd = exec.Command(cmdstr[0])
-	default:
-		cmd = exec.Command(cmdstr[0], cmdstr[1:]...)
+func runCmdArray(cmdArray [][]string) (string, error) {
+	var out bytes.Buffer
+	var err error
+	var i int
+	length := len(cmdArray)
+
+	execArray, _, writeArray := makeExecArray(cmdArray, length)
+	execArray[length-1].Stdout = &out
+
+	for i = 0; i < length; i++ {
+		err = execArray[i].Start()
+		if err != nil {
+			return "", err
+		}
 	}
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	for i = 0; i < length-1; i++ {
+		err = execArray[i].Wait()
+		writeArray[i].Close()
+		if err != nil {
+			return "", err
+		}
+	}
+	err = execArray[length-1].Wait()
+	return out.String(), err
 }
 
 func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, optCmd optToCmd) error {
 	var cmdout string
+	var cmdArray [][]string
 	var err error
 	var wait bool
 	var exit bool
 
-	sleepTime := time.Duration(optCmd.sleepSec) * time.Second
+	sleepTime := time.Duration(optCmd.sleepSec * 1000) * time.Millisecond
+	cmdArray = append(cmdArray, cmdstr)
 	for {
 		select {
 		case wait = <-chanCmd.wait:
@@ -194,7 +172,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 			time.Sleep(sleepTime)
 			continue
 		}
-		cmdout, err = runCmdstr(cmdstr[0:]...)
+		cmdout, err = runCmdArray(cmdArray)
 		if !optCmd.force && err != nil {
 			if cmdout != "" {
 				fmt.Print(cmdout)
@@ -209,123 +187,45 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	return err
 }
 
-func checkHead(line strArray, head int, dhead int, height int) int {
-	if line.orgLen < height {
-		return 0
-	}
-	head = head + dhead
-	if head < 0 {
-		head = 0
-	} else if height+head > line.orgLen {
-		head = line.orgLen - height
-	}
-	return head
-}
-
-func eraseToBegin(len int) {
-	if len == 0 {
-		return
-	} else if len == 1 {
-		fmt.Print(csiCode(Delete, All))
-		fmt.Print(csiCode(Begin, 1))
-	} else {
-		for i := 0; i < len-1; i++ {
-			fmt.Print(csiCode(Delete, All))
-			fmt.Print(csiCode(Above, 1))
-		}
-	}
-}
-
-func moveToBegin(len int) {
-	if len == 0 {
-		return
-	} else if len == 1 {
-		fmt.Print(csiCode(Begin, 1))
-	} else {
-		fmt.Print(csiCode(Above, len-1))
-	}
-}
-
-func printlnInWidth(line string, width int) {
-	if len(line) > width {
-		fmt.Println(line[:width])
-	} else {
-		fmt.Println(line)
-	}
-}
-
-func printInWidth(line string, width int) {
-	if len(line) > width {
-		fmt.Print(line[:width])
-	} else {
-		fmt.Print(line)
-	}
-}
-
-func printLine(line strArray, head int, width int) {
-	last := line.len + head - 1
-	for i := head; i < last; i++ {
-		fmt.Print(csiCode(Delete, All))
-		printlnInWidth(line.elem[i], width)
-	}
-	fmt.Print(csiCode(Delete, All))
-	printInWidth(line.elem[last], width)
-}
-
-func printLineDiff(old strArray, new strArray, head int, width int) {
-	last := new.len + head - 1
-	for i := head; i < last+1 ; i++ {
-		if i < old.len && new.elem[i] != "" && old.elem[i] == new.elem[i] {
-			fmt.Print(csiCode(Below, 1))
-			continue
-		}
-		fmt.Print(csiCode(Delete, All))
-		if i < last {
-			printlnInWidth(new.elem[i], width)
-		} else {
-			printInWidth(new.elem[i], width)
-		}
-	}
-}
-
-func rewriteLines(cmdoutChan <-chan string, chanWrite stdinToWrite) {
-	var oldline strArray
-	var newline strArray
+func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
+	var oldLine stdout.StrArray
+	var line stdout.StrArray
 	var cmdout string
 	var height, width int
 	var head int
 
 	for {
-		winSize, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+		winSize, err := ioctl.GetWinsize()
 		if err != nil {
 			log.Fatal(err)
 		}
 		height = int(winSize.Row) - 1
 		width = int(winSize.Col)
 		select {
-		case refresh := <-chanWrite.refresh:
+		case refresh := <-chanPrint.refresh:
 			if refresh {
-				eraseToBegin(oldline.len)
-				printLine(oldline, head, width)
+				stdout.Erase(oldLine)
+				stdout.Lines(oldLine, head, stdout.New)
 			}
-		case dhead := <-chanWrite.head:
-			newhead := checkHead(oldline, head, dhead, height)
-			if newhead != head {
-				head = newhead
-				eraseToBegin(oldline.len)
-				printLine(oldline, head, width)
+		case dHead := <-chanPrint.head:
+			newHead := stdout.CheckHead(oldLine, head, dHead, height)
+			if newHead != head {
+				head = newHead
+				stdout.Erase(oldLine)
+				stdout.Lines(oldLine, head, stdout.AsIs)
 			}
 		case cmdout = <-cmdoutChan:
-			newline = newStrArray(cmdout, "\n", height)
-			head = checkHead(newline, head, 0, height)
-			if oldline.len != newline.len {
-				eraseToBegin(oldline.len)
-				printLine(newline, head, width)
+			line = stdout.NewStrArray(cmdout, "\n", height, width, CountMaxDef)
+			head = stdout.CheckHead(line, head, 0, height)
+			if !stdout.IsSameHeight(oldLine, line) {
+				stdout.Erase(oldLine)
+				stdout.Lines(line, head, stdout.New)
 			} else {
-				moveToBegin(oldline.len)
-				printLineDiff(oldline, newline, head, width)
+				line = stdout.CheckChange(oldLine, line)
+				stdout.BackToTop(oldLine)
+				stdout.Lines(line, head, stdout.Changes)
 			}
-			oldline = newline
+			oldLine = line
 		}
 	}
 }
@@ -335,14 +235,13 @@ func main() {
 	var shell bool
 	var optCmd optToCmd
 	var err error
-	var orgLflag uint32
 	var ret int
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.UintVar(&optCmd.sleepSec, "s", 1, "sleep second")
+	flag.Float64Var(&optCmd.sleepSec, "s", SleepSecDef, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
 	flag.BoolVar(&shell, "sh", false, "execute through the shell")
 	flag.BoolVar(&optCmd.force, "f", false, "ignore execute error")
@@ -359,33 +258,30 @@ func main() {
 	}
 
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
-	chanWrite := stdinToWrite{make(chan bool), make(chan int)}
+	chanPrint := stdinToPrint{make(chan bool), make(chan int)}
 
-	term, err := unix.IoctlGetTermios(int(os.Stdout.Fd()), unix.TCGETS)
+	err = ioctl.SetOrgTermios()
 	if err != nil {
 		log.Fatal(err)
 	}
-	orgLflag = term.Lflag
 
 	if !interactive {
-		term.Lflag &= ^(uint32(unix.ECHO) | uint32(unix.ICANON))
-		err = unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
+		err = ioctl.ChangeTermiosLflag(^(ioctl.ECHO|ioctl.ICANNON))
 		if err != nil {
 			log.Fatal(err)
 		}
-		stdinChan := make(chan rune)
-		go treatStdin(stdinChan, chanCmd, chanWrite)
+		stdinChan := make(chan string)
+		go treatStdin(stdinChan, chanCmd, chanPrint)
 		go getStdin(stdinChan)
 	}
 
 	cmdoutChan := make(chan string)
-	go rewriteLines(cmdoutChan, chanWrite)
+	go printRepeatedly(cmdoutChan, chanPrint)
 	err = runCmdRepeatedly(cmd, cmdoutChan, chanCmd, optCmd)
 	if err != nil {
 		ret = 1
 	}
-	term.Lflag = orgLflag
-	err = unix.IoctlSetTermios(int(os.Stdout.Fd()), unix.TCSETS, term)
+	err = ioctl.ResetTermiosLflag()
 	if err != nil {
 		log.Fatal(err)
 	}
