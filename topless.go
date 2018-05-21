@@ -208,7 +208,7 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 				stdout.Lines(oldLine, head, stdout.New)
 			}
 		case dHead := <-chanPrint.head:
-			newHead := stdout.CheckHead(oldLine, head, dHead, height)
+			newHead := stdout.CheckHead(oldLine, head, dHead)
 			if newHead != head {
 				head = newHead
 				stdout.Erase(oldLine)
@@ -216,7 +216,7 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 			}
 		case cmdout = <-cmdoutChan:
 			line = stdout.NewStrArray(cmdout, "\n", height, width, CountMaxDef)
-			head = stdout.CheckHead(line, head, 0, height)
+			head = stdout.CheckHead(line, head, 0)
 			if !stdout.IsSameHeight(oldLine, line) {
 				stdout.Erase(oldLine)
 				stdout.Lines(line, head, stdout.New)

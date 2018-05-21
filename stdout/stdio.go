@@ -213,15 +213,15 @@ func colorDiff(orgColor string, color string, oldLine string, line string) strin
 	return colorStr
 }
 
-func CheckHead(line StrArray, head int, dhead int, height int) int {
-	if line.length < height {
+func CheckHead(line StrArray, head int, dhead int) int {
+	if line.length == line.height {
 		return 0
 	}
 	head = head + dhead
 	if head < 0 {
 		head = 0
-	} else if height+head > line.length {
-		head = line.length - height
+	} else if line.height+head > line.length {
+		head = line.length - line.height
 	}
 	return head
 }
