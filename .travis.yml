@@ -1,0 +1,14 @@
+language: go
+
+go:
+  - "1.10.x"
+
+env:
+  global:
+    - TZ=Asia/Tokyo
+
+install:
+  - make deps
+
+script:
+  - make
