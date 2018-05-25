@@ -35,7 +35,6 @@ const (
 )
 
 const (
-	CSI     = "\033["
 	CtrlD   = "\004"
 	CtrlU   = "\025"
 	UpKey   = "\033[A"
