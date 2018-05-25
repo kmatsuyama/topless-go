@@ -17,7 +17,6 @@ import (
 const (
 	StdinBuf = 128
 	SleepSecDef = 1
-	CountMaxDef = 3
 )
 
 const (
@@ -215,7 +214,7 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 				stdout.Lines(oldLine, head, stdout.AsIs)
 			}
 		case cmdout = <-cmdoutChan:
-			line = stdout.NewStrArray(cmdout, "\n", height, width, CountMaxDef)
+			line = stdout.NewStrArray(cmdout, "\n", height, width)
 			head = stdout.CheckHead(line, head, 0)
 			if !stdout.IsSameHeight(oldLine, line) {
 				stdout.Erase(oldLine)

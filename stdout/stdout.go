@@ -2,6 +2,7 @@ package stdout
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"os"
 )
@@ -65,6 +66,7 @@ const (
 const (
 	LineColorDef = Red
 	WordColorDef = Red_
+	CountMaxDef = 3
 )
 
 type StrArray struct {
@@ -87,7 +89,7 @@ type Color struct {
 type printFn func(...interface{}) (n int, err error)
 type printLine func(int, StrArray, printFn) ()
 
-func NewStrArray(str string, delim string, height int, width int, countMax int) StrArray {
+func NewStrArray(str string, delim string, height int, width int) StrArray {
 	elem := strings.Split(str, delim)
 	length := len(elem)
 	if length < height {
@@ -100,7 +102,7 @@ func NewStrArray(str string, delim string, height int, width int, countMax int) 
 		height: height,
 		width: width,
 		count: make([]int, length),
-		countMax: countMax,
+		countMax: CountMaxDef,
 	}
 }
 
@@ -116,6 +118,14 @@ func csiCode(ctrl rune, num ...int) string {
 		return fmt.Sprintf("%s%d;%d%c", CSI, num[0], num[1], ctrl)
 	}
 	return ""
+}
+
+func getCountMax() int {
+	countMax, err :=  strconv.Atoi(os.Getenv("COUNT_MAX"))
+	if err != nil {
+		return CountMaxDef
+	}
+	return countMax
 }
 
 func Erase(line StrArray) {
@@ -321,6 +331,7 @@ func checkLineCount(line StrArray, i int) int {
 
 func CheckChange(oldLine StrArray, line StrArray) StrArray {
 	color := getColor()
+	line.countMax = getCountMax()
 	for i := 0; i < min(oldLine.length, line.length); i++ {
 		if oldLine.elem[i] == line.elem[i] {
 			line.count[i] = checkLineCount(oldLine, i)
