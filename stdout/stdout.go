@@ -3,6 +3,7 @@ package stdout
 import (
 	"fmt"
 	"strings"
+	"os"
 )
 
 const (
@@ -61,6 +62,10 @@ const (
 	After  = 1
 	All    = 2
 )
+const (
+	LineColorDef = Red
+	WordColorDef = Red_
+)
 
 type StrArray struct {
 	elem      []string
@@ -70,6 +75,13 @@ type StrArray struct {
 	width     int
 	count     []int
 	countMax  int
+}
+
+type Color struct {
+	line_start string
+	line_end   string
+	word_start string
+	word_end   string
 }
 
 type printFn func(...interface{}) (n int, err error)
@@ -188,24 +200,97 @@ func min(a, b int) int {
    return a
 }
 
-func coloring(color string, line string) string {
-	return color + line + Normal
+func checkColor(color string) string {
+	switch color {
+	case "Normal":
+		return Normal
+	case "Red":
+		return Red
+	case "Green":
+		return Green
+	case "Yellow":
+		return Yellow
+	case "Blue":
+		return Blue
+	case "Magenta":
+		return Magenta
+	case "Cyan":
+		return Cyan
+	case "White":
+		return White
+	case "RedB":
+		return RedB
+	case "GreenB":
+		return GreenB
+	case "YellowB":
+		return YellowB
+	case "BlueB":
+		return BlueB
+	case "MagentaB":
+		return MagentaB
+	case "CyanB":
+		return CyanB
+	case "WhiteB":
+		return WhiteB
+	case "Red_":
+		return Red_
+	case "Green_":
+		return Green_
+	case "Yellow_":
+		return Yellow_
+	case "Blue_":
+		return Blue_
+	case "Magenta_":
+		return Magenta_
+	case "Cyan_":
+		return Cyan_
+	case "White_":
+		return White_
+	default:
+		return color
+	}
 }
 
-func colorDiff(orgColor string, color string, oldLine string, line string) string {
-	var same bool
+func getColor() Color {
+	line_start := checkColor(os.Getenv("LINE_COLOR"))
+	if len(line_start) == 0 {
+		line_start = LineColorDef
+	}
+	line_end := checkColor(os.Getenv("LINE_END"))
+	if len(line_end) == 0 {
+		line_end = Normal
+	}
+	word_start := checkColor(os.Getenv("WORD_COLOR"))
+	if len(word_start) == 0 {
+		word_start = WordColorDef
+	}
+	word_end := checkColor(os.Getenv("WORD_END"))
+	if len(word_end) == 0 {
+		word_end = Normal + line_start
+	}
+	return Color {
+		line_start: line_start,
+		line_end: line_end,
+		word_start: word_start,
+		word_end: word_end,
+	}
+}
 
-	colorStr := coloring(orgColor, line)
-	num := len(orgColor)
+func colorDiff(color Color, oldLine string, line string) string {
+	var same bool
+	var colorStr string
+
+	colorStr = color.line_start + line + color.line_end
+	num := len(color.line_start)
 
 	for i := 0; i < min(len(oldLine), len(line)); i++ {
 		if line[i] == oldLine[i] && !same {
-			colorStr = colorStr[:num] + Normal + orgColor + colorStr[num:]
-			num += len(Normal + orgColor)
+			colorStr = colorStr[:num] + color.word_end + colorStr[num:]
+			num += len(color.word_end)
 			same = true
 		} else if line[i] != oldLine[i] && same {
-			colorStr = colorStr[:num] + color + colorStr[num:]
-			num += len(color)
+			colorStr = colorStr[:num] + color.word_start + colorStr[num:]
+			num += len(color.word_start)
 			same = false
 		}
 		num++
@@ -235,6 +320,7 @@ func checkLineCount(line StrArray, i int) int {
 }
 
 func CheckChange(oldLine StrArray, line StrArray) StrArray {
+	color := getColor()
 	for i := 0; i < min(oldLine.length, line.length); i++ {
 		if oldLine.elem[i] == line.elem[i] {
 			line.count[i] = checkLineCount(oldLine, i)
@@ -242,7 +328,7 @@ func CheckChange(oldLine StrArray, line StrArray) StrArray {
 				line.colorElem[i] = oldLine.colorElem[i]
 			}
 		} else {
-			line.colorElem[i] = colorDiff(Red, Red_, wrapIn(oldLine.width, oldLine.elem[i]),  wrapIn(line.width, line.elem[i]))
+			line.colorElem[i] = colorDiff(color, wrapIn(oldLine.width, oldLine.elem[i]),  wrapIn(line.width, line.elem[i]))
 			line.count[i] = line.countMax + 1
 		}
 	}
