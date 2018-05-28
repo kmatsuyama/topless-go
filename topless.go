@@ -17,7 +17,6 @@ import (
 const (
 	StdinBuf = 128
 	SleepSecDef = 1
-	CountMaxDef = 3
 )
 
 const (
@@ -36,7 +35,6 @@ const (
 )
 
 const (
-	CSI     = "\033["
 	CtrlD   = "\004"
 	CtrlU   = "\025"
 	UpKey   = "\033[A"
@@ -208,15 +206,15 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 				stdout.Lines(oldLine, head, stdout.New)
 			}
 		case dHead := <-chanPrint.head:
-			newHead := stdout.CheckHead(oldLine, head, dHead, height)
+			newHead := stdout.CheckHead(oldLine, head, dHead)
 			if newHead != head {
 				head = newHead
 				stdout.Erase(oldLine)
 				stdout.Lines(oldLine, head, stdout.AsIs)
 			}
 		case cmdout = <-cmdoutChan:
-			line = stdout.NewStrArray(cmdout, "\n", height, width, CountMaxDef)
-			head = stdout.CheckHead(line, head, 0, height)
+			line = stdout.NewStrArray(cmdout, "\n", height, width)
+			head = stdout.CheckHead(line, head, 0)
 			if !stdout.IsSameHeight(oldLine, line) {
 				stdout.Erase(oldLine)
 				stdout.Lines(line, head, stdout.New)
