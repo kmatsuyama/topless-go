@@ -54,6 +54,8 @@ type stdinToCmd struct {
 type stdinToPrint struct {
 	refresh chan bool
 	head    chan int
+	erase   chan int
+	up      chan int
 }
 
 func getStdin(stdinChan chan<- string) {
@@ -72,6 +74,29 @@ func getStdin(stdinChan chan<- string) {
 	log.Fatal(err)
 }
 
+func stdinToSetenv(stdinChan <-chan string ,chanCmd stdinToCmd, chanPrint stdinToPrint) {
+	var err error
+
+	chanCmd.wait <- true
+	chanPrint.erase <- 1
+	err = ioctl.ResetTermiosLflag()
+	if err != nil {
+		chanCmd.exit <- true
+	}
+	stdin_env := <- stdinChan
+	env := strings.Split(strings.TrimRight(stdin_env, "\n"), "=")
+	if len(env) > 0 {
+		os.Setenv(env[0], strings.Join(env[1:], "="))
+	}
+	chanPrint.up <- 2
+	chanPrint.refresh <- true
+	err = ioctl.ChangeTermiosLflag(^(ioctl.ECHO|ioctl.ICANNON))
+	if err != nil {
+		chanCmd.exit <- true
+	}
+	chanCmd.wait <- false
+}
+
 func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanPrint stdinToPrint) {
 	var wait bool
 	var exit bool
@@ -85,6 +110,8 @@ func treatStdin(stdinChan <-chan string, chanCmd stdinToCmd, chanPrint stdinToPr
 			chanCmd.wait <- wait
 		case "r":
 			chanPrint.refresh <- true
+		case "e":
+			stdinToSetenv(stdinChan, chanCmd, chanPrint)
 		case CtrlD:
 			chanPrint.head <- +10
 		case CtrlU:
@@ -200,6 +227,10 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 		height = int(winSize.Row) - 1
 		width = int(winSize.Col)
 		select {
+		case up := <-chanPrint.up:
+			stdout.MoveUp(up)
+		case erase := <-chanPrint.erase:
+			stdout.EraseUp(erase)
 		case refresh := <-chanPrint.refresh:
 			if refresh {
 				stdout.Erase(oldLine)
@@ -256,7 +287,7 @@ func main() {
 	}
 
 	chanCmd := stdinToCmd{make(chan bool), make(chan bool)}
-	chanPrint := stdinToPrint{make(chan bool), make(chan int)}
+	chanPrint := stdinToPrint{make(chan bool), make(chan int), make(chan int), make(chan int)}
 
 	err = ioctl.SetOrgTermios()
 	if err != nil {

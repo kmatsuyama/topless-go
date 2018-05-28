@@ -129,10 +129,10 @@ func getCountMax() int {
 }
 
 func Erase(line StrArray) {
-	eraseUp(line.height)
+	EraseUp(line.height)
 }
 
-func eraseUp(length int) {
+func EraseUp(length int) {
 	if length == 0 {
 		return
 	} else if length == 1 {
@@ -147,10 +147,10 @@ func eraseUp(length int) {
 }
 
 func BackToTop(line StrArray) {
-	moveUp(line.height)
+	MoveUp(line.height)
 }
 
-func moveUp(length int) {
+func MoveUp(length int) {
 	if length == 0 {
 		return
 	} else if length == 1 {
