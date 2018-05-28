@@ -191,7 +191,9 @@ func Changes(i int, line StrArray, printF printFn) {
 		fmt.Print(csiCode(Delete, All))
 		printF(wrapIn(line.width, line.elem[i]))
 	} else {
-		fmt.Print(csiCode(Below, 1))
+		if i < line.height-1 {
+			fmt.Print(csiCode(Below, 1))
+		}
 	}
 }
 
