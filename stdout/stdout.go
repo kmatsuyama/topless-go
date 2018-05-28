@@ -206,10 +206,10 @@ func Lines(line StrArray, head int, printL printLine) {
 }
 
 func min(a, b int) int {
-   if a > b {
-      return b
-   }
-   return a
+	if a > b {
+		return b
+	}
+	return a
 }
 
 func checkColor(color string) string {
