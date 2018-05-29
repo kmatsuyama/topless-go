@@ -129,10 +129,10 @@ func getCountMax() int {
 }
 
 func Erase(line StrArray) {
-	eraseUp(line.height)
+	EraseUp(line.height)
 }
 
-func eraseUp(length int) {
+func EraseUp(length int) {
 	if length == 0 {
 		return
 	} else if length == 1 {
@@ -147,10 +147,10 @@ func eraseUp(length int) {
 }
 
 func BackToTop(line StrArray) {
-	moveUp(line.height)
+	MoveUp(line.height)
 }
 
-func moveUp(length int) {
+func MoveUp(length int) {
 	if length == 0 {
 		return
 	} else if length == 1 {
@@ -191,7 +191,9 @@ func Changes(i int, line StrArray, printF printFn) {
 		fmt.Print(csiCode(Delete, All))
 		printF(wrapIn(line.width, line.elem[i]))
 	} else {
-		fmt.Print(csiCode(Below, 1))
+		if i < line.height-1 {
+			fmt.Print(csiCode(Below, 1))
+		}
 	}
 }
 
@@ -204,10 +206,10 @@ func Lines(line StrArray, head int, printL printLine) {
 }
 
 func min(a, b int) int {
-   if a > b {
-      return b
-   }
-   return a
+	if a > b {
+		return b
+	}
+	return a
 }
 
 func checkColor(color string) string {

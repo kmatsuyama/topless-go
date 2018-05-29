@@ -1,6 +1,7 @@
 
 TARGET = topless
 DEST   = /usr/local/bin
+VPATH  = ioctl:stdout
 
 .SUFFIXES: .go
 
@@ -23,5 +24,5 @@ clean:
 deps:
 	go get golang.org/x/sys/unix
 
-.go:
+topless: topless.go ioctl_darwin.go ioctl_linux.go stdout.go
 	go build -v $<
