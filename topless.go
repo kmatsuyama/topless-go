@@ -190,23 +190,22 @@ func getSleepTime() time.Duration {
 func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, optCmd optToCmd) error {
 	var cmdout string
 	var cmdArray [][]string
+	var sleepTime time.Duration
 	var err error
 	var wait bool
 	var exit bool
 
 	cmdArray = append(cmdArray, cmdstr)
 	for {
-		sleepTime := getSleepTime()
 		select {
 		case wait = <-chanCmd.wait:
 		case exit = <-chanCmd.exit:
-		default:
+		case <-time.After(sleepTime):
 		}
 		if exit {
 			break
 		}
 		if wait {
-			time.Sleep(sleepTime)
 			continue
 		}
 		cmdout, err = runCmdArray(cmdArray)
@@ -218,7 +217,7 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 			break
 		}
 		cmdoutChan <- cmdout
-		time.Sleep(sleepTime)
+		sleepTime = getSleepTime()
 	}
 	close(cmdoutChan)
 	return err
