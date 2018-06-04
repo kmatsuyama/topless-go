@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"strconv"
 	"time"
 	"./ioctl"
 	"./stdout"
@@ -42,7 +43,6 @@ const (
 )
 
 type optToCmd struct {
-	sleepSec float64
 	force    bool
 }
 
@@ -175,6 +175,18 @@ func runCmdArray(cmdArray [][]string) (string, error) {
 	return out.String(), err
 }
 
+func setSleepTime(sleepSec float64) {
+	os.Setenv("SLEEP_TIME", strconv.FormatFloat(sleepSec, 'f', -1, 64))
+}
+
+func getSleepTime() time.Duration {
+	sleepSec, err := strconv.ParseFloat(os.Getenv("SLEEP_TIME"), 64)
+	if err != nil {
+		sleepSec = SleepSecDef
+	}
+	return time.Duration(sleepSec * 1000) * time.Millisecond
+}
+
 func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinToCmd, optCmd optToCmd) error {
 	var cmdout string
 	var cmdArray [][]string
@@ -182,9 +194,9 @@ func runCmdRepeatedly(cmdstr []string, cmdoutChan chan<- string, chanCmd stdinTo
 	var wait bool
 	var exit bool
 
-	sleepTime := time.Duration(optCmd.sleepSec * 1000) * time.Millisecond
 	cmdArray = append(cmdArray, cmdstr)
 	for {
+		sleepTime := getSleepTime()
 		select {
 		case wait = <-chanCmd.wait:
 		case exit = <-chanCmd.exit:
@@ -262,6 +274,7 @@ func printRepeatedly(cmdoutChan <-chan string, chanPrint stdinToPrint) {
 func main() {
 	var interactive bool
 	var shell bool
+	var sleepSec float64
 	var optCmd optToCmd
 	var err error
 	var ret int
@@ -270,11 +283,13 @@ func main() {
 		fmt.Printf("Usage: %s [-s sec] [-i] [-sh] [-f] command\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.Float64Var(&optCmd.sleepSec, "s", SleepSecDef, "sleep second")
+	flag.Float64Var(&sleepSec, "s", SleepSecDef, "sleep second")
 	flag.BoolVar(&interactive, "i", false, "interactive")
 	flag.BoolVar(&shell, "sh", false, "execute through the shell")
 	flag.BoolVar(&optCmd.force, "f", false, "ignore execute error")
 	flag.Parse()
+
+	setSleepTime(sleepSec)
 
 	if len(flag.Args()) == 0 {
 		flag.Usage()
